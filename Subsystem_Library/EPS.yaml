@@ -1,0 +1,7 @@
+power_subsystems:
+  - name: EPS_1
+    solar_panel_area: 100 # cm^2
+    mass: 200 # g
+    height: 4 # cm
+    max_temperature: 50 # C
+    min_temperature: 0 # C

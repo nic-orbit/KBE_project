@@ -1,0 +1,15 @@
+onboard_computers:
+  - name: OBC_1
+    storage: 8GB
+    power_consumption: 5W
+    mass: 100g
+
+  - name: OBC_2
+    storage: 16GB
+    power_consumption: 7W
+    mass: 120g
+
+  - name: OBC_3
+    storage: 4GB
+    power_consumption: 3W
+    mass: 80g
