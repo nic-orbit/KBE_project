@@ -1,2 +1,9 @@
+#file endings
 *.pyc
 *.pyo
+*.ipynb
+*.ipynb_checkpoints
+
+#folders
+__pycache__
+experiments

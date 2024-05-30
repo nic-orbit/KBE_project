@@ -1,12 +1,13 @@
 from parapy.geom import Box
 from parapy.gui import display
 
-import concrete_classes as cc
+import concrete_classes.high_level as hl
 import abstract_classes as ac
 
 
+
 def testing():
-    my_mission = cc.Mission(mission_lifetime=24, # months
+    my_mission = hl.Mission(mission_lifetime=24, # months
                             orbit_type="SSO", # SSO, Polar, Equatorial, custom
                             custom_inclination=30, # deg
                             reqiured_GSD=50, # m

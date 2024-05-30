@@ -2,7 +2,11 @@ from parapy.core import *
 from parapy.geom import *
 from parapy.core.validate import OneOf, LessThan, GreaterThan, GreaterThanOrEqualTo
 import abstract_classes as ac
+from concrete_classes import subsystems as subsys
 import numpy as np
+import yaml
+import os
+from pprint import pprint
 
 
 class Mission(GeomBase):
@@ -48,16 +52,15 @@ class Mission(GeomBase):
     @Part
     def groundstation(self):
         return GroundStation()
-    
 
-    
+
 class CubeSat(GeomBase):
     orbit_altitude = Input() # km
 
     @Attribute
     def orbit(self):
         return Orbit(altitude=self.orbit_altitude,
-                     inclination=self.parent.orbit_inclination)
+                inclination=self.parent.orbit_inclination)
     
     @Attribute
     def mass(self):
@@ -75,9 +78,37 @@ class CubeSat(GeomBase):
                 power += child.power
         return power
     
+    @Attribute
+    def subsystem_dict(self):
+        # Get the current directory of the script
+        script_dir = os.path.dirname(__file__)
+        relative_path = os.path.join('..', 'Subsystem_Library')
+
+        # Construct the full relative file path
+        file_path_trunk = os.path.join(script_dir, relative_path)
+
+        subsystems = {"OBC": "OBC.yaml", "EPS": "EPS.yaml", "COMM": "COMM.yaml"}
+
+        for key, value in subsystems.items():
+            file_path = os.path.join(file_path_trunk, value)
+
+            # Check if the file exists
+            if not os.path.exists(file_path):
+                raise FileNotFoundError(f"The file '{file_path}' does not exist.")
+
+            with open(file_path) as f:
+                try:
+                    subsystems[key] = yaml.safe_load(f)
+                except yaml.YAMLError as exc:
+                    print(exc)
+
+        pprint(subsystems)
+        return subsystems
+
+
     @Part
     def payload(self):
-        return Payload(width=self.parent.instrument_width,
+        return subsys.Payload(width=self.parent.instrument_width,
                        height=self.parent.instrument_height,
                        length=self.parent.instrument_length,
                        mass=self.parent.instrument_mass,
@@ -86,43 +117,20 @@ class CubeSat(GeomBase):
     
     @Part
     def communication(self):
-        return Communication()
+        return subsys.COMM()
     
     @Part
     def power(self):
-        return EPS()
-
-
-class OBC(ac.Subsystem):
-    pass
-
-
-class ADCS(ac.Subsystem):
-    pass
-
-
-class EPS(ac.Subsystem):
-    pass
-
-class Communication(ac.Subsystem):
-    pass
+        return subsys.EPS()
+    
+    @Part
+    def obc(self):
+        return subsys.OBC()
     
 
-class Payload(ac.Subsystem):
-    pass
-
-    # @Part
-    # def shape(self):
-    #     if self.shape == "box":
-    #         return Box(length=self.length, width=self.width, height=self.height)
-    #     elif self.shape == "cylinder":
-    #         return Cylinder(radius=self.diameter/2, height=self.height)
-    #     elif self.shape == "sphere":
-    #         return Sphere(radius=self.diameter/2)
-    #     elif self.shape == "cone":
-    #         return Cone(radius=self.diameter/2, height=self.height)
-    #     else:
-    #         raise ValueError(f"Invalid or no shape specified for {self.name}")
+class GroundStation(GeomBase):
+    latitiude = Input(0)
+    longitude = Input(0)
 
 
 class Orbit(Base):
@@ -144,9 +152,3 @@ class Orbit(Base):
     @Attribute
     def semi_major_axis(self):
         return 0.5*(self.apoapsis+self.periapsis)
-    
-
-class GroundStation(GeomBase):
-    latitiude = Input(0)
-    longitude = Input(0)
-
