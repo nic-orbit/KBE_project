@@ -45,6 +45,10 @@ class Mission(GeomBase):
     def cubesat(self):
         return CubeSat(orbit_altitude=self.max_orbit_altitude)
     
+    @Part
+    def groundstation(self):
+        return GroundStation()
+    
 
     
 class CubeSat(GeomBase):
@@ -77,7 +81,8 @@ class CubeSat(GeomBase):
                        height=self.parent.instrument_height,
                        length=self.parent.instrument_length,
                        mass=self.parent.instrument_mass,
-                       power=self.parent.instrument_power_consumption)
+                       power=self.parent.instrument_power_consumption
+                       )
     
     @Part
     def communication(self):

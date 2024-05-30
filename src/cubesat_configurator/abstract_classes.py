@@ -5,6 +5,7 @@ from parapy.core.validate import OneOf, LessThan, GreaterThan, GreaterThanOrEqua
 class SpaceComponent(GeomBase):
     mass = Input(0)
     power = Input(0)
+    cost = Input(0)
 
 # class CoM(Base):
 #     x = Input(0)
