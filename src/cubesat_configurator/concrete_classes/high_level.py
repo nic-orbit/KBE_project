@@ -4,12 +4,14 @@ from parapy.core.validate import OneOf, LessThan, GreaterThan, GreaterThanOrEqua
 import abstract_classes as ac
 from concrete_classes import subsystems as subsys
 import numpy as np
+import pykep as pk
 import yaml
 import os
 from pprint import pprint
+import paseos_parser as pp
 
 
-class Mission(GeomBase):
+class Mission(GeomBase): 
     #mission requirements
     mission_lifetime = Input(doc="Mission Lifetime in months") # months
     reqiured_GSD = Input() # m
@@ -129,8 +131,9 @@ class CubeSat(GeomBase):
     
 
 class GroundStation(GeomBase):
-    latitiude = Input(0)
-    longitude = Input(0)
+    latitude = Input(52.0116)
+    longitude = Input(4.3571)
+    elevation = Input(0)
 
 
 class Orbit(Base):
@@ -143,12 +146,34 @@ class Orbit(Base):
 
     @Attribute
     def apoapsis(self):
-        return self.altitude*(1+self.eccentricity)
+        return (self.altitude + pk.EARTH_RADIUS)*(1+self.eccentricity) # Earth radius = 6378 km
 
     @Attribute
     def periapsis(self):
-        return self.altitude*(1-self.eccentricity)
+        return (self.altitude + pk.EARTH_RADIUS)*(1-self.eccentricity)
     
     @Attribute
     def semi_major_axis(self):
         return 0.5*(self.apoapsis+self.periapsis)
+    
+    @Attribute
+    def position_vector(self):
+        """
+        Convert the Keplerian elements to a position vector in the ECI frame for this orbit in meters.
+        Returns:    
+            r_eci: np.array
+                Position vector in the ECI frame
+        """
+        r_eci, v_eci = pp.keplerian_to_eci(self.semi_major_axis, self.eccentricity, self.inclination, self.RAAN, self.argument_of_periapsis, self.true_anomaly)
+        return r_eci*1000
+    
+    @Attribute
+    def velocity_vector(self):
+        """
+        Convert the Keplerian elements to a velocity vector in the ECI frame for this orbit in meters per second.
+        Returns:    
+            v_eci: np.array
+                Velocity vector in the ECI frame
+        """
+        r_eci, v_eci = pp.keplerian_to_eci(self.semi_major_axis, self.eccentricity, self.inclination, self.RAAN, self.argument_of_periapsis, self.true_anomaly)
+        return v_eci*1000

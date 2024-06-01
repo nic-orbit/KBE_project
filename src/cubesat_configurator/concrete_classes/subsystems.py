@@ -13,7 +13,6 @@ class Payload(ac.Subsystem):
 
 
 class OBC(ac.Subsystem):
-    # Comment from Nic
     pass
 
 
