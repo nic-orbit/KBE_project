@@ -13,7 +13,7 @@ class Payload(ac.Subsystem):
 
 
 class OBC(ac.Subsystem):
-    pass
+    pass power
 
 
 class EPS(ac.Subsystem):
