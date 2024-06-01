@@ -4,7 +4,7 @@
 
 Nicolas Oidtmann
 
-Gargi Pantoji
+Gargi Sunil Pantoji
 
 # Installation
 
