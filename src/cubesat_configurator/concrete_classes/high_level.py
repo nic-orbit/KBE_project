@@ -146,15 +146,19 @@ class Orbit(Base):
 
     @Attribute
     def apoapsis(self):
-        return (self.altitude + pk.EARTH_RADIUS)*(1+self.eccentricity) # Earth radius = 6378 km
+        return (self.altitude*1000 + pk.EARTH_RADIUS)*(1+self.eccentricity) # in m
 
     @Attribute
     def periapsis(self):
-        return (self.altitude + pk.EARTH_RADIUS)*(1-self.eccentricity)
+        return (self.altitude*1000 + pk.EARTH_RADIUS)*(1-self.eccentricity) # in m
+    
+    @Attribute
+    def period(self):
+        return 2 * np.pi * np.sqrt(self.semi_major_axis**3 / pk.MU_EARTH) # in s
     
     @Attribute
     def semi_major_axis(self):
-        return 0.5*(self.apoapsis+self.periapsis)
+        return 0.5*(self.apoapsis+self.periapsis) # in m
     
     @Attribute
     def position_vector(self):
@@ -163,9 +167,10 @@ class Orbit(Base):
         Returns:    
             r_eci: np.array
                 Position vector in the ECI frame
-        """
-        r_eci, v_eci = pp.keplerian_to_eci(self.semi_major_axis, self.eccentricity, self.inclination, self.RAAN, self.argument_of_periapsis, self.true_anomaly)
-        return r_eci*1000
+        """        
+        # convert km in m
+        r_eci, v_eci = pk.par2ic([self.semi_major_axis, self.eccentricity, self.inclination, self.RAAN, self.argument_of_periapsis, self.true_anomaly], pk.MU_EARTH)
+        return r_eci
     
     @Attribute
     def velocity_vector(self):
@@ -174,6 +179,7 @@ class Orbit(Base):
         Returns:    
             v_eci: np.array
                 Velocity vector in the ECI frame
-        """
-        r_eci, v_eci = pp.keplerian_to_eci(self.semi_major_axis, self.eccentricity, self.inclination, self.RAAN, self.argument_of_periapsis, self.true_anomaly)
-        return v_eci*1000
+        """     
+        # convert km in m
+        r_eci, v_eci = pk.par2ic([self.semi_major_axis, self.eccentricity, self.inclination, self.RAAN, self.argument_of_periapsis, self.true_anomaly], pk.MU_EARTH)
+        return v_eci

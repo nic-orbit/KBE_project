@@ -53,17 +53,79 @@ def keplerian_to_eci(a, e, i, RAAN, argument_of_periapsis, true_anomaly):
     return r_eci, v_eci
 
 
+class GroundContactInfo:
+    def __init__(self):
+        self.first_contact = True
+        self.lost_contact = False
+        self.stored_first_contact_time = None
+        self.comm_window_list = []
 
-# Define an actor of type SpacecraftActor of name mySat
-sat_actor = ActorBuilder.get_actor_scaffold(name="myCubeSat",
-                                       actor_type=SpacecraftActor,
-                                       epoch=pk.epoch(0))
+    def test(self):
+        print("Hello World")
 
-# Define the central body as Earth by using pykep APIs.
-earth = pk.planet.jpl_lp("earth")
 
-# Let's set the orbit of sat_actor.
-ActorBuilder.set_orbit(actor=sat_actor,
-                       position=[10000000, 0, 0],
-                       velocity=[0, 8000.0, 0],
-                       epoch=pk.epoch(0), central_body=earth)
+    def has_link_to_ground(self, actor:SpacecraftActor, ground_station:GroundstationActor):
+        """
+        Checks if actor is in contact with the ground.
+
+        Parameters:
+        actor: The satellite or space object being monitored.
+        ground_station: A ground station object.
+
+        Returns:
+        bool: True if contact is established with the ground station, False otherwise.
+        """
+        time = actor.local_time
+
+        contact = actor.is_in_line_of_sight(ground_station, time)  # bool
+
+        return contact
+
+
+    def has_link_to_ground_station(self, actor: SpacecraftActor, station: GroundstationActor):
+        """
+        Checks if the actor is in contact with any of the ground stations.
+
+        Parameters:
+        actor: The satellite or space object being monitored.
+        ground_stations: A list of ground station objects.
+
+        Returns:
+        bool: True if contact is established with any ground station, False otherwise.
+        """
+        time = actor.local_time
+        
+        # Check contact with each station
+        contact = actor.is_in_line_of_sight(station, time)  # bool
+        if contact:
+            if self.first_contact:
+                self.first_contact = False
+                self.lost_contact = False
+                self.stored_first_contact_time = time
+                print(f"--- CONTACT with {station} at: {time}")
+            return True  # Returns True if contact is established with any ground station
+
+        elif not self.first_contact:
+            self.lost_contact = True
+
+            comm_window = round(
+                (time.mjd2000 - self.stored_first_contact_time.mjd2000) * pk.DAY2SEC  # pk.DAY2SEC = 86400
+            )
+            self.comm_window_list.append(comm_window)
+
+            print(f"--- CONTACT LOST with {station} at: {time}")
+            print(f"--- Communication window: {comm_window} [s]")
+            print("-----------------------------------------------------")
+
+        self.first_contact = True
+        return False  # Returns False if contact is not established with any ground station
+
+
+    def total_contact_time(self):
+        """
+        Calculates the total contact time from the communication windows.
+
+        Returns:
+        float: Total contact time in seconds.
+        """
+        return sum(self.comm_window_list)
