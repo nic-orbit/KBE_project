@@ -1,11 +1,7 @@
 from parapy.core import *
 from parapy.geom import *
 from parapy.core.validate import OneOf, LessThan, GreaterThan, GreaterThanOrEqualTo
-import abstract_classes as ac
-import numpy as np
-import yaml
-import os
-from pprint import pprint
+import subsystem as ac
     
 
 class Payload(ac.Subsystem):
@@ -28,7 +24,5 @@ class COMM(ac.Subsystem):
     pass
 
 
-class ADCS(ac.Subsystem):
-    pass
 
 

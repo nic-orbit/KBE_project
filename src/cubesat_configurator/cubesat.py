@@ -1,8 +1,7 @@
 from parapy.core import *
 from parapy.geom import *
 from parapy.core.validate import OneOf, LessThan, GreaterThan, GreaterThanOrEqualTo, IsInstance
-import abstract_classes as ac
-from concrete_classes import subsystems as subsys
+import subsystems as subsys
 import numpy as np
 import pykep as pk
 import yaml
@@ -12,82 +11,9 @@ import paseos_parser as pp
 import paseos
 from paseos import ActorBuilder, SpacecraftActor, GroundstationActor
 import constants
+from orbit import Orbit
 
 
-class Mission(GeomBase): 
-    #mission requirements
-    mission_lifetime = Input(doc="Mission Lifetime in months") # months
-    reqiured_GSD = Input() # m
-    orbit_type = Input() # SSO, Polar, Equatorial, custom
-    custom_inclination = Input(0) # deg TBD if we use this!
-    # Ground Stations selection
-    ground_station_indeces = Input(validator=IsInstance(list))
-    #system requirements
-    req_pointing_accuracy = Input(validator= GreaterThan(0)) # deg
-    #instrument requirements
-    instrument_min_operating_temp = Input() # deg C
-    instrument_max_operating_temp = Input() # deg C
-    #instrument characteristics
-    instrument_data_rate = Input() # kbps
-    instrument_focal_length = Input() # mm
-    instrument_pixel_size = Input() # µm
-    instrument_power_consumption = Input() # W
-    instrument_mass = Input() # kg
-    instrument_height = Input() # mm
-    instrument_width = Input() # mm
-    instrument_length = Input() # mm
-
-    @Attribute
-    def ground_station_dataframe(self):
-        stations = pp.read_ground_stations_from_csv()
-        stations_list = []
-
-        for i in self.ground_station_indeces:
-            # check that index is within the list
-            if 0 <= i <= stations.last_valid_index():
-                lat = stations.loc[i, "Lat"]
-                lon = stations.loc[i, "Lon"]
-                company = stations.loc[i, "Company"]
-                location = stations.loc[i, "Location"]
-                gs_name = f"gs_actor_{i}"
-                stations_list.append(stations.loc[i])
-                print(f"Added '{company}' groundstation {i} located at {location}")
-            else:
-                print(f"No ground station with index {i} in data.")
-        return stations_list
-
-    @Attribute
-    def number_of_ground_stations(self):
-        return len(self.ground_station_indeces)
-    
-    @Attribute
-    def orbit_inclination(self):
-        inc_SSO = np.round(0.0087033*self.max_orbit_altitude+90.2442419, 2) # deg, derived from linear regression of SSO altitudes and inclinations from wikipedia
-        return 90 if self.orbit_type == "Polar" else inc_SSO if self.orbit_type == "SSO" else 0 if self.orbit_type == "Equatorial" else self.custom_inclination
-    
-    
-    @Attribute
-    def max_orbit_altitude(self):
-        """
-        Calculate the maximum orbit altitude based on the required ground sample distance (GSD) and the instrument
-        characteristics.
-        """
-        h = (self.reqiured_GSD / (self.instrument_pixel_size * 10**-6) ) * self.instrument_focal_length * 10**-6  # km
-        return h
-
-    @Part
-    def cubesat(self):
-        return CubeSat(orbit_altitude=self.max_orbit_altitude)
-    
-    @Part
-    def groundstation(self):
-        return GroundStation(quantify=self.number_of_ground_stations,
-                             latitude=self.ground_station_dataframe[child.index]['Lat'],
-                             longitude=self.ground_station_dataframe[child.index]['Lon'],
-                             elevation=self.ground_station_dataframe[child.index]['Elevation'],
-                             location=self.ground_station_dataframe[child.index]['Location'],
-                             number=self.ground_station_dataframe[child.index]['Number']
-                             )
 
 
 class CubeSat(GeomBase):
@@ -95,7 +21,7 @@ class CubeSat(GeomBase):
 
     @Attribute
     def system_data_rate(self):
-        return self.parent.instrument_data_rate*1.05 # assume 5% of additional bus data rate
+        return self.parent.instrument_data_rate*constants.SystemConfig.system__margin # assume 5% of additional bus data rate
     
     @Attribute
     def min_downlink_data_rate(self):
@@ -107,7 +33,7 @@ class CubeSat(GeomBase):
                 inclination=self.parent.orbit_inclination)
     
     @Attribute
-    def mass(self):
+    def total_mass(self):
         mass = 0
         for child in self.children:
             if isinstance(child, ac.Subsystem):
@@ -115,7 +41,7 @@ class CubeSat(GeomBase):
         return mass
 
     @Attribute
-    def power_consumption(self):
+    def total_power_consumption(self):
         power = 0
         for child in self.children:
             if isinstance(child, ac.Subsystem):
@@ -148,6 +74,7 @@ class CubeSat(GeomBase):
 
         pprint(subsystems)
         return subsystems
+    
     
     @Attribute
     def simulate_first_orbit(self):
@@ -305,81 +232,14 @@ class CubeSat(GeomBase):
     def obc(self):
         return subsys.OBC()
     
-
-class GroundStation(Base):
-    latitude = Input()
-    longitude = Input()
-    elevation = Input()
-    company = Input()
-    location = Input()
-    number=Input()
-
-    @Attribute
-    def name(self):
-        # name is a combination of index and location
-        return f"GS_{self.number} ({self.location})"
-
-
-class Orbit(Base):
-    altitude = Input() # km
-    inclination = Input() # deg
-    eccentricity = Input(0) # dimensionless
-    RAAN = Input(0) # deg
-    argument_of_periapsis = Input(0) # deg
-    true_anomaly = Input(0) # deg
-
-    @Attribute
-    def apoapsis(self):
-        return (self.altitude*1000 + pk.EARTH_RADIUS)*(1+self.eccentricity) # in m
-
-    @Attribute
-    def periapsis(self):
-        return (self.altitude*1000 + pk.EARTH_RADIUS)*(1-self.eccentricity) # in m
+    @Part
+    def aocs(self):
+        return subsys.AOCS()
     
-    @Attribute
-    def period(self):
-        return 2 * np.pi * np.sqrt(self.semi_major_axis**3 / pk.MU_EARTH) # in s
-    
-    @Attribute
-    def semi_major_axis(self):
-        return 0.5*(self.apoapsis+self.periapsis) # in m
-    
-    @Attribute
-    def position_vector(self):
-        """
-        Convert the Keplerian elements to a position vector in the ECI frame for this orbit in meters.
-        Returns:    
-            r_eci: np.array
-                Position vector in the ECI frame
-        """        
-        # convert km in m
-        r_eci, v_eci = pk.par2ic([self.semi_major_axis, self.eccentricity, self.inclination, self.RAAN, self.argument_of_periapsis, self.true_anomaly], pk.MU_EARTH)
-        return r_eci
-    
-    @Attribute
-    def velocity_vector(self):
-        """
-        Convert the Keplerian elements to a velocity vector in the ECI frame for this orbit in meters per second.
-        Returns:    
-            v_eci: np.array
-                Velocity vector in the ECI frame
-        """     
-        # convert km in m
-        r_eci, v_eci = pk.par2ic([self.semi_major_axis, self.eccentricity, self.inclination, self.RAAN, self.argument_of_periapsis, self.true_anomaly], pk.MU_EARTH)
-        return v_eci
-    
-    def __str__(self):
-        return ("------ Orbit ------  \n"
-                # print keplerian elements
-                f"semi-major axis: {self.semi_major_axis} m\n"
-                f"inclination: {self.inclination} deg\n"
-                f"eccentricity: {self.eccentricity}\n"
-                f"RAAN: {self.RAAN} deg\n"
-                f"argument of periapsis: {self.argument_of_periapsis} deg\n"
-                f"true anomaly: {self.true_anomaly} deg\n"
-                #print orbital period
-                f"orbital period: {self.period} s \n"
-                f"position vector: {self.position_vector} \n"
-                f"velocity vector: {self.velocity_vector} \n"
-                "-------------------\n"
-        )
+    @Part
+    def structure(self):
+        return subsys.Structure()
+
+    @Part
+    def thermal(self):
+        return subsys.Thermal()

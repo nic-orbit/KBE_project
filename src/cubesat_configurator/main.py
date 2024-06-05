@@ -8,9 +8,7 @@ import paseos
 from paseos import ActorBuilder, SpacecraftActor, GroundstationActor
 import numpy as np
 
-import concrete_classes.high_level as hl
-import abstract_classes as ac
-import paseos_parser as pp
+from mission import Mission
 from pprint import pprint
 
 import constants
@@ -45,11 +43,11 @@ def test():
                                 
 
 def paseos_test():
-    my_mission = hl.Mission(mission_lifetime=24, # months
+    my_mission = Mission(mission_lifetime=24, # months
                             orbit_type="SSO", # SSO, Polar, Equatorial, custom
                             custom_inclination=30, # deg
                             reqiured_GSD=50, # m
-                            ground_station_indeces=[58], # Delft, Havaii, Kourou
+                            ground_station_selection=[58], # Delft, Havaii, Kourou
                             req_pointing_accuracy=0.5, # deg
                             instrument_min_operating_temp=-10, # deg C
                             instrument_max_operating_temp=40, # deg C
@@ -68,6 +66,10 @@ def paseos_test():
     print(my_mission.cubesat.system_data_rate)
 
 
+def test2():
+    my_mission = Mission()
+    display(my_mission)
+
 if __name__ == '__main__':
     paseos_test()
-    # test()
+    # test2()
