@@ -222,7 +222,7 @@ class CubeSat(GeomBase):
                 plotter.update(sim)
 
         if plotting:
-            plotter.animate(sim=sim, dt=dt, steps=runs, save_to_file="mymovie.mp4")
+            plotter.animate(sim=sim, dt=dt, steps=runs, save_to_file="animations\mymovie")
 
         total_comm_window = 0
         comm_windows = []
