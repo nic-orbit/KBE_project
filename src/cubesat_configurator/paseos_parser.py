@@ -2,6 +2,9 @@ import pykep as pk
 import paseos
 from paseos import ActorBuilder, SpacecraftActor, GroundstationActor
 import numpy as np
+import os
+import pandas as pd
+from parapy.core.sequence import Sequence
 
 
 def keplerian_to_eci(a, e, i, RAAN, argument_of_periapsis, true_anomaly):
@@ -53,36 +56,20 @@ def keplerian_to_eci(a, e, i, RAAN, argument_of_periapsis, true_anomaly):
     return r_eci, v_eci
 
 
-class GroundContactInfo:
-    def __init__(self):
+class GroundContactInfo():
+    def __init__(self, spacecraft: SpacecraftActor, station: GroundstationActor):
         self.first_contact = True
         self.lost_contact = False
         self.stored_first_contact_time = None
         self.comm_window_list = []
+        self.spacecraft = spacecraft
+        self.station = station
 
     def test(self):
         print("Hello World")
 
 
-    def has_link_to_ground(self, actor:SpacecraftActor, ground_station:GroundstationActor):
-        """
-        Checks if actor is in contact with the ground.
-
-        Parameters:
-        actor: The satellite or space object being monitored.
-        ground_station: A ground station object.
-
-        Returns:
-        bool: True if contact is established with the ground station, False otherwise.
-        """
-        time = actor.local_time
-
-        contact = actor.is_in_line_of_sight(ground_station, time)  # bool
-
-        return contact
-
-
-    def has_link_to_ground_station(self, actor: SpacecraftActor, station: GroundstationActor):
+    def has_link_to_ground_station(self):
         """
         Checks if the actor is in contact with any of the ground stations.
 
@@ -93,16 +80,16 @@ class GroundContactInfo:
         Returns:
         bool: True if contact is established with any ground station, False otherwise.
         """
-        time = actor.local_time
+        time = self.spacecraft.local_time
         
         # Check contact with each station
-        contact = actor.is_in_line_of_sight(station, time)  # bool
+        contact = self.spacecraft.is_in_line_of_sight(self.station, time)  # bool
         if contact:
             if self.first_contact:
                 self.first_contact = False
                 self.lost_contact = False
                 self.stored_first_contact_time = time
-                print(f"--- CONTACT with {station} at: {time}")
+                print(f"--- CONTACT with {self.station} at: {time}")
             return True  # Returns True if contact is established with any ground station
 
         elif not self.first_contact:
@@ -113,7 +100,7 @@ class GroundContactInfo:
             )
             self.comm_window_list.append(comm_window)
 
-            print(f"--- CONTACT LOST with {station} at: {time}")
+            print(f"--- CONTACT LOST with {self.station} at: {time}")
             print(f"--- Communication window: {comm_window} [s]")
             print("-----------------------------------------------------")
 
@@ -129,3 +116,92 @@ class GroundContactInfo:
         float: Total contact time in seconds.
         """
         return sum(self.comm_window_list)
+    
+
+def set_ground_station_old(epoch, simulation, index_list:list):
+    """Give indexes of groundstations in sheet and add them to the sim"""
+    stations = read_ground_stations_from_csv()
+    stations_list = []
+
+    for i in index_list:
+        # check that index is within the list
+        if 0 <= i <= stations.last_valid_index():
+            lat = stations.loc[i, "Lat"]
+            lon = stations.loc[i, "Lon"]
+            company = stations.loc[i, "Company"]
+            location = stations.loc[i, "Location"]
+            gs_name = f"gs_actor_{i}"
+            locals()[gs_name] = ActorBuilder.get_actor_scaffold(
+                name=f"gs_{i} ({location})", actor_type=GroundstationActor, epoch=epoch
+            )
+
+            ActorBuilder.set_ground_station_location(
+                locals()[gs_name],
+                latitude=lat,
+                longitude=lon,
+                elevation=90,
+                minimum_altitude_angle=5,
+            )
+            # add the gs to simulation
+            simulation.add_known_actor(locals()[gs_name])
+
+            stations_list.append(locals()[gs_name])
+
+            print(f"Added '{company}' groundstation {i} located at {location}")
+        else:
+            print(f"No ground station with index {i} in data.")
+
+    return stations_list
+
+
+def set_ground_station(epoch, simulation, ground_stations:Sequence):
+    """Give indexes of groundstations in sheet and add them to the sim"""
+    stations_list = []
+
+    for station in ground_stations:
+        locals()[station.name] = ActorBuilder.get_actor_scaffold(
+            name=station.name, actor_type=GroundstationActor, epoch=epoch
+        )
+
+        ActorBuilder.set_ground_station_location(
+            locals()[station.name],
+            latitude=station.latitude,
+            longitude=station.longitude,
+            elevation=station.elevation,
+            minimum_altitude_angle=5,
+        )
+        # add the gs to simulation
+        simulation.add_known_actor(locals()[station.name])
+
+        stations_list.append(locals()[station.name])
+
+    return stations_list
+
+
+def read_ground_stations_from_csv():
+    # Get the current directory of the script
+    script_dir = os.path.dirname(__file__)
+    relative_path = os.path.join('data', 'ground_stations.csv')
+
+    # Construct the full relative file path
+    gs_info_path = os.path.join(script_dir, relative_path)
+
+    all_gs_import = pd.read_csv(gs_info_path)
+    return all_gs_import
+
+
+
+if __name__ == '__main__':
+    # import progressbar
+    # from time import sleep
+
+    # bar = progressbar.ProgressBar(maxval=20, \
+    #     widgets=[progressbar.Bar('=', '[', ']'), ' ', progressbar.Percentage()])
+    # bar.start()
+    # for i in range(20):
+    #     bar.update(i+1)
+    #     sleep(0.1)
+        
+    # bar.finish()
+    t0 = pk.epoch_from_string("2024-august-01 08:00:00")
+    print(t0.mjd2000)

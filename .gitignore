@@ -3,6 +3,8 @@
 *.pyo
 *.ipynb
 *.ipynb_checkpoints
+*.mp4
+*.png
 
 #folders
 __pycache__
