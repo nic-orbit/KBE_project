@@ -9,7 +9,7 @@ class Subsystem(GeomBase):
     diameter = Input(1)
     mass = Input(0)
     power = Input(0)
-    cost = Input(0)
+    cost = Input(0) #implement specific range for mass, power, cost (rating on 3?)
 
     @Attribute
     def score_calculation():

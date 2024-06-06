@@ -22,19 +22,19 @@ class CubeSat(GeomBase):
 
     @Attribute
     def system_data_rate(self):
-        return self.parent.instrument_data_rate*constants.SystemConfig.system__margin # assume 5% of additional bus data rate
+        return self.parent.instrument_data_rate*constants.SystemConfig.system__margin # assume 5% of additional bus data rate, has to be changed
     
     @Attribute
     def min_downlink_data_rate(self):
         return self.system_data_rate/(self.simulate_first_orbit["comm_window_fraction"])
 
-    @Attribute
+    @Attribute 
     def orbit(self):
         return Orbit(altitude=self.orbit_altitude,
                 inclination=self.parent.orbit_inclination)
     
     @Attribute
-    def total_mass(self):
+    def total_mass(self): #Do we need overall mass and power using a margin first?
         mass = 0
         for child in self.children:
             if isinstance(child, ac.Subsystem):

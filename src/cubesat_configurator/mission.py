@@ -18,22 +18,7 @@ class Mission(GeomBase):
     #system requirements
     req_pointing_accuracy = Input(validator= GreaterThan(0)) # deg
 
-    ##### MOVE EVERYTHING TO INSTRUMENT CLASS #####
-    #instrument requirements
-    instrument_min_operating_temp = Input() # deg C
-    instrument_max_operating_temp = Input() # deg C
-    #instrument characteristics
-    #### data_rate is a Attribute and inputs are image pixel resolution 
-    #### and pixel depth and number of images per day
-    instrument_data_rate = Input() # kbps
-    instrument_focal_length = Input() # mm
-    instrument_pixel_size = Input() # µm
-    instrument_power_consumption = Input() # W
-    instrument_mass = Input() # kg
-    instrument_height = Input() # mm
-    instrument_width = Input() # mm
-    instrument_length = Input() # mm
-    instrument_cost = Input() # USD
+    
 
     @Attribute
     def ground_station_dataframe(self):
