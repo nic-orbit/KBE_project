@@ -40,7 +40,7 @@ class Payload(ac.Subsystem):
         """
         Calculates the length of the sensor / processor side based on the resolution and pixel size.
         """
-        return max(self.instrument_pixel_resolution)*self.instrument_pixel_size*10**-3 # mm
+        return max([self.instrument_image_width, self.instrument_image_height])*self.instrument_pixel_size*10**-3 # mm
 
     @Attribute
     def instrument_data_rate(self):
