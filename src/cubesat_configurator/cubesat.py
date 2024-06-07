@@ -23,7 +23,8 @@ class CubeSat(GeomBase):
 
     @Attribute
     def system_data_rate(self):
-        return self.parent.instrument_data_rate*constants.SystemConfig.system__margin # assume 5% of additional bus data rate, has to be changed
+
+        return self.payload.instrument_data_rate*constants.SystemConfig.system__margin # assume 5% of additional bus data rate, has to be changed
     
     @Attribute
     def min_downlink_data_rate(self):
@@ -35,7 +36,7 @@ class CubeSat(GeomBase):
                 inclination=self.parent.orbit_inclination)
     
     @Attribute
-    def total_mass(self): #Do we need overall mass and power using a margin first?
+    def total_mass(self): # Do we need overall mass and power using a margin first?
         mass = 0
         for child in self.children:
             if isinstance(child, ac.Subsystem):
@@ -50,6 +51,7 @@ class CubeSat(GeomBase):
                 power += child.power
         return power
     
+    #Try to implement separately for each subsystem
     @Attribute
     def subsystem_dict(self):
         # Get the current directory of the script

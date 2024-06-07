@@ -22,8 +22,8 @@ class Payload(ac.Subsystem):
     instrument_length = Input() # mm
     instrument_cost = Input() # USD
     instrument_images_per_day=Input() #number
-    instrument_pixel_resolution=Input() #range to be defined or we split this into w and h
-    instrument_bit_depth=Input() #range to be defined
+    instrument_pixel_resolution=Input() #range to be defined or we split this into w and h, consider list
+    instrument_bit_depth=Input() #range to be defined (1-24) Check gs for inputvalidator
 
     @Attribute
     def pixel_count(self):
