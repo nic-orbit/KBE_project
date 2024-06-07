@@ -190,7 +190,6 @@ def read_ground_stations_from_csv():
     return all_gs_import
 
 
-
 if __name__ == '__main__':
     # import progressbar
     # from time import sleep

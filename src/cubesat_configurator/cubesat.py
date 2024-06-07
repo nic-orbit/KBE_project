@@ -18,6 +18,7 @@ from orbit import Orbit
 
 
 class CubeSat(GeomBase):
+    # DELETE / Move to Orbit class
     orbit_altitude = Input() # km
 
     @Attribute

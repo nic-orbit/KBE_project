@@ -16,12 +16,20 @@ class Mission(GeomBase):
     # Ground Stations selection
     ground_station_selection = Input(validator=IsInstance(list))
     #system requirements
-    req_pointing_accuracy = Input(validator= GreaterThan(0)) # deg
+    req_pointing_accuracy = Input(validator=GreaterThan(0)) # deg
 
     
-
+    # helper
     @Attribute
     def ground_station_dataframe(self):
+        """
+        This function reads ground station data from a CSV file, selects specific ground stations based on the indices provided in 'self.ground_station_selection', and returns these selected stations as a list. 
+
+        For each index in 'self.ground_station_selection', the function checks if the index is within the valid range of the stations DataFrame. If it is, the function retrieves the latitude, longitude, company, location, and name of the ground station at that index, appends the station to the 'stations_list', and prints a message indicating the addition of the ground station. If the index is not valid, the function prints a message indicating the absence of a ground station at that index.
+
+        Returns:
+            stations_list (list): A list of selected ground stations from the CSV file.
+        """
         stations = pp.read_ground_stations_from_csv()
         stations_list = []
 
@@ -39,6 +47,7 @@ class Mission(GeomBase):
                 print(f"No ground station with index {i} in data.")
         return stations_list
 
+    # helper
     @Attribute
     def number_of_ground_stations(self):
         return len(self.ground_station_selection)
