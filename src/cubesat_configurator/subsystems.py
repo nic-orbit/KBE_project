@@ -22,9 +22,11 @@ class Payload(ac.Subsystem):
     instrument_images_per_day=Input() #number
     instrument_image_width=Input() #pixels
     instrument_image_height=Input() #pixels #range to be defined or we split this into w and h, consider list
-    instrument_bit_depth=Input(validator=Range(min=1, max=24)) #range to be defined (1-24) Check gs for inputvalidator
+    instrument_bit_depth=Input(validator=Range(limit1=1, limit2=24)) #range to be defined (1-24) Check gs for inputvalidator
 
     height = Input(instrument_height)
+    mass = Input(instrument_mass)
+    cost = Input(instrument_cost)
 
     @Attribute
     def pixel_count(self):

@@ -29,9 +29,9 @@ class CubeSat(GeomBase):
         """
         mass = 0
         for child in self.children:
-            if isinstance(child, ac.Subsystem):
+            if isinstance(child, ac.Subsystem) and hasattr(child, "mass"):
                 mass += child.mass
-        return mass
+        return mass*(1 + constants.SystemConfig.system_margin) # kg
 
     @Attribute
     def total_power_consumption(self):
@@ -40,9 +40,9 @@ class CubeSat(GeomBase):
         """
         power = 0
         for child in self.children:
-            if isinstance(child, ac.Subsystem):
+            if isinstance(child, ac.Subsystem) and hasattr(child, "power"):
                 power += child.power
-        return power
+        return power*(1 + constants.SystemConfig.system_margin) # W
 
     @Attribute
     def system_data_rate(self):
@@ -69,32 +69,32 @@ class CubeSat(GeomBase):
         return Orbit(altitude=self.parent.max_orbit_altitude)
     
     #to be deleted! - Try to implement separately for each subsystem
-    @Attribute
-    def subsystem_dict(self):
-        # Get the current directory of the script
-        script_dir = os.path.dirname(__file__)
-        relative_path = os.path.join('..', 'Subsystem_Library')
+    # @Attribute
+    # def subsystem_dict(self):
+    #     # Get the current directory of the script
+    #     script_dir = os.path.dirname(__file__)
+    #     relative_path = os.path.join('..', 'Subsystem_Library')
 
-        # Construct the full relative file path to subsystems library
-        file_path_trunk = os.path.join(script_dir, relative_path)
+    #     # Construct the full relative file path to subsystems library
+    #     file_path_trunk = os.path.join(script_dir, relative_path)
 
-        subsystems = {"OBC": "OBC.yaml", "EPS": "EPS.yaml", "COMM": "COMM.yaml"}
+    #     subsystems = {"OBC": "OBC.yaml", "EPS": "EPS.yaml", "COMM": "COMM.yaml"}
 
-        for key, value in subsystems.items():
-            file_path = os.path.join(file_path_trunk, value)
+    #     for key, value in subsystems.items():
+    #         file_path = os.path.join(file_path_trunk, value)
 
-            # Check if the file exists
-            if not os.path.exists(file_path):
-                raise FileNotFoundError(f"The file '{file_path}' does not exist.")
+    #         # Check if the file exists
+    #         if not os.path.exists(file_path):
+    #             raise FileNotFoundError(f"The file '{file_path}' does not exist.")
 
-            with open(file_path) as f:
-                try:
-                    subsystems[key] = yaml.safe_load(f)
-                except yaml.YAMLError as exc:
-                    print(exc)
+    #         with open(file_path) as f:
+    #             try:
+    #                 subsystems[key] = yaml.safe_load(f)
+    #             except yaml.YAMLError as exc:
+    #                 print(exc)
 
-        pprint(subsystems)
-        return subsystems
+    #     pprint(subsystems)
+    #     return subsystems
     
     
     @Attribute
@@ -248,7 +248,8 @@ class CubeSat(GeomBase):
                               instrument_length=100, # mm
                               instrument_cost=10000, # USD
                               instrument_images_per_day=1, #number
-                              instrument_pixel_resolution=[1280, 720], #range to be defined or we split this into w and h, consider list
+                              instrument_image_width=1260, #pixels
+                              instrument_image_height=1260, #pixels 
                               instrument_bit_depth=8 #range to be defined (1-24) Check gs for inputvalidator
                               )
     

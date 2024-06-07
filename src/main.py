@@ -17,7 +17,7 @@ def paseos_test():
                             orbit_type="Polar", # SSO, Polar, Equatorial, custom
                             custom_inclination=30, # deg
                             reqiured_GSD=100, # m
-                            ground_station_selection=[58, 53, 49], # 58=Delft, 53=Havaii, 49=Kourou
+                            ground_station_selection=[58], # 58=Delft, 53=Havaii, 49=Kourou
                             req_pointing_accuracy=0.5, # deg
                             )
     print(my_mission.cubesat.orbit)

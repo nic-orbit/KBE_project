@@ -109,6 +109,7 @@ class Mission(GeomBase):
                              latitude=self.ground_station_info[child.index]['Lat'],
                              longitude=self.ground_station_info[child.index]['Lon'],
                              elevation=self.ground_station_info[child.index]['Elevation'],
+                             company=self.ground_station_info[child.index]['Company'],
                              location=self.ground_station_info[child.index]['Location'],
                              name=self.ground_station_info[child.index]['Name'],
                              number=self.ground_station_info[child.index]['Number']
