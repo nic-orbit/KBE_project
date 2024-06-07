@@ -4,15 +4,37 @@ import numpy as np
 import pykep as pk
 from typing import cast
 from parapy.core.validate import OneOf, LessThan, GreaterThan, GreaterThanOrEqualTo, IsInstance, Range, AdaptedValidator
-from custom_validators import altitude_validator
+from cubesat_configurator.custom_validators import altitude_validator
 
 
 class Orbit(Base):
-    altitude = Input(validator=AdaptedValidator(altitude_validator)) # km
+    altitude = Input() # km
     eccentricity = Input(0) # dimensionless
     RAAN = Input(0) # deg
     argument_of_periapsis = Input(0) # deg
     true_anomaly = Input(0) # deg
+
+    @altitude.validator
+    def altitude(self, value):
+        """
+        Validator for the altitude input of Orbit class. The altitude must higher then 100 km and lower than 2000 km.
+        """
+        if value < 100:
+            print(
+                  "The altitude must be higher than 150 km. \n"
+                  f"Current value: {value} km, please increase GSD or adjust instrument characteristics (e.g. focal length or pixel size).\n"
+                  "Formula: h [km] = (GSD [m] / (pixel_size [µm] * 10**-6) ) * focal_length [mm] * 10**-6  "
+                  )
+            return False
+        if value > 2000:
+            print(
+                  "The altitude must be lower than 2000 km. \n"
+                  f"Current value: {value} km, please decrease GSD or adjust instrument characteristics (e.g. focal length or pixel size).\n"
+                  "Formula: h [km] = (GSD [m] / (pixel_size [µm] * 10**-6) ) * focal_length [mm] * 10**-6  "
+                  )
+            return False
+        return True
+
     
     @Attribute
     def inclination(self):

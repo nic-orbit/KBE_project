@@ -1,7 +1,7 @@
 from parapy.core import *
 from parapy.geom import *
 from parapy.core.validate import OneOf, LessThan, GreaterThan, GreaterThanOrEqualTo
-import subsystem as ac
+from cubesat_configurator import subsystem as ac
 
 
 class Payload(ac.Subsystem):

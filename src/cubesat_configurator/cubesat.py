@@ -1,18 +1,18 @@
 from parapy.core import *
 from parapy.geom import *
 from parapy.core.validate import OneOf, LessThan, GreaterThan, GreaterThanOrEqualTo, IsInstance, Range
-import subsystems as subsys
-import subsystem as ac
+from cubesat_configurator import subsystems as subsys
+from cubesat_configurator import subsystem as ac
 import numpy as np
 import pykep as pk
 import yaml
 import os
 from pprint import pprint
-import paseos_parser as pp
+from cubesat_configurator import paseos_parser as pp
 import paseos
 from paseos import ActorBuilder, SpacecraftActor, GroundstationActor
-import constants
-from orbit import Orbit
+from cubesat_configurator import constants
+from cubesat_configurator.orbit import Orbit
 
 
 

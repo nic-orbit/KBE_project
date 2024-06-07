@@ -8,10 +8,8 @@ import paseos
 from paseos import ActorBuilder, SpacecraftActor, GroundstationActor
 import numpy as np
 
-from mission import Mission
+from cubesat_configurator.mission import Mission
 from pprint import pprint
-
-import constants
 
 
 def paseos_test():

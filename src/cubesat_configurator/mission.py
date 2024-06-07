@@ -1,9 +1,9 @@
 from parapy.core import *
 from parapy.geom import *
 from parapy.core.validate import OneOf, LessThan, GreaterThan, GreaterThanOrEqualTo, IsInstance
-import paseos_parser as pp
-from cubesat import CubeSat
-from groundstation import GroundStation
+from cubesat_configurator import paseos_parser as pp
+from cubesat_configurator.cubesat import CubeSat
+from cubesat_configurator.groundstation import GroundStation
 
 
 class Mission(GeomBase): 
@@ -63,19 +63,25 @@ class Mission(GeomBase):
         """
         stations = pp.read_ground_stations_from_csv()
         stations_list = []
+        stations_full_dict = {}
 
         for i in self.ground_station_selection:
-            # check that index is within the list
+        # check that index is within the list
             if 0 <= i <= stations.last_valid_index():
-                lat = stations.loc[i, "Lat"]
-                lon = stations.loc[i, "Lon"]
-                company = stations.loc[i, "Company"]
-                location = stations.loc[i, "Location"]
-                gs_name = f"gs_actor_{i}"
-                stations_list.append(stations.loc[i])
-                print(f"Added '{company}' groundstation {i} located at {location}")
+                station_dict = {
+                    "Name": f"GS_{stations.loc[i, 'Number']} ({stations.loc[i, 'Location']})",
+                    "Lat": stations.loc[i, "Lat"],
+                    "Lon": stations.loc[i, "Lon"],
+                    "Company": stations.loc[i, "Company"],
+                    "Location": stations.loc[i, "Location"],
+                    "Elevation": stations.loc[i, "Elevation"],
+                    "Number": f"{stations.loc[i, 'Number']}"                    
+                }
+                stations_list.append(station_dict)
+                print(f"Added '{station_dict['Company']}' groundstation {i} located at {station_dict['Location']}")
             else:
                 print(f"No ground station with index {i} in data.")
+        
         return stations_list
 
     # helper
@@ -104,5 +110,6 @@ class Mission(GeomBase):
                              longitude=self.ground_station_info[child.index]['Lon'],
                              elevation=self.ground_station_info[child.index]['Elevation'],
                              location=self.ground_station_info[child.index]['Location'],
+                             name=self.ground_station_info[child.index]['Name'],
                              number=self.ground_station_info[child.index]['Number']
                              )
