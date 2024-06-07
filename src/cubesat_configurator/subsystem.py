@@ -3,13 +3,14 @@ from parapy.geom import *
 from parapy.core.validate import OneOf, LessThan, GreaterThan, GreaterThanOrEqualTo
 
 class Subsystem(GeomBase):
-    height = Input(1)
-    width = Input(1)
-    length = Input(1)
-    diameter = Input(1)
-    mass = Input(0)
-    power = Input(0)
-    cost = Input(0) #implement specific range for mass, power, cost (rating on 3?)
+    height = Input()
+    mass = Input()
+    power = Input()
+    cost = Input() #implement specific range for mass, power, cost (rating on 3?)
+
+    # we force width and length to be always equal to 100 mm to adhere to CubeSat form factor!
+    width = 100
+    length = 100
 
     @Attribute
     def score_calculation():

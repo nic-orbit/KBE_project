@@ -2,15 +2,22 @@ from parapy.core import *
 from parapy.geom import *
 import numpy as np
 import pykep as pk
+from typing import cast
+from parapy.core.validate import OneOf, LessThan, GreaterThan, GreaterThanOrEqualTo, IsInstance, Range, AdaptedValidator
+from custom_validators import altitude_validator
 
 
 class Orbit(Base):
-    altitude = Input() # km
-    inclination = Input() # deg
+    altitude = Input(validator=AdaptedValidator(altitude_validator)) # km
     eccentricity = Input(0) # dimensionless
     RAAN = Input(0) # deg
     argument_of_periapsis = Input(0) # deg
     true_anomaly = Input(0) # deg
+    
+    @Attribute
+    def inclination(self):
+        inc_SSO = np.round(0.0087033*self.altitude+90.2442419, 2) # deg, derived from linear regression of SSO altitudes and inclinations from wikipedia
+        return 90 if self.parent.parent.orbit_type == "Polar" else inc_SSO if self.parent.parent.orbit_type == "SSO" else 0 if self.parent.parent.orbit_type == "Equatorial" else self.parent.parent.custom_inclination
 
     @Attribute
     def apoapsis(self):
@@ -54,6 +61,7 @@ class Orbit(Base):
     
     def __str__(self):
         return ("------ Orbit ------  \n"
+                f"altitude: {self.altitude} km\n"
                 # print keplerian elements
                 f"semi-major axis: {self.semi_major_axis} m\n"
                 f"inclination: {self.inclination} deg\n"
