@@ -1,18 +1,14 @@
 from parapy.core import *
 from parapy.geom import *
-from parapy.core.validate import OneOf, LessThan, GreaterThan, GreaterThanOrEqualTo
+from parapy.core.validate import OneOf, LessThan, GreaterThan, GreaterThanOrEqualTo, IsInstance, Between
 import subsystem as ac
     
 
 class Payload(ac.Subsystem):
-    ##### MOVE EVERYTHING TO INSTRUMENT CLASS #####
     #instrument requirements
     instrument_min_operating_temp = Input() # deg C
     instrument_max_operating_temp = Input() # deg C
     #instrument characteristics
-    #### data_rate is a Attribute and inputs are image pixel resolution 
-    #### and pixel depth and number of images per day
-    # instrument_data_rate = Input() # kbps
     instrument_focal_length = Input() # mm
     instrument_pixel_size = Input() # µm
     instrument_power_consumption = Input() # W
@@ -22,12 +18,13 @@ class Payload(ac.Subsystem):
     instrument_length = Input() # mm
     instrument_cost = Input() # USD
     instrument_images_per_day=Input() #number
-    instrument_pixel_resolution=Input() #range to be defined or we split this into w and h, consider list
-    instrument_bit_depth=Input() #range to be defined (1-24) Check gs for inputvalidator
+    instrument_image_width=Input() #pixels
+    instrument_image_height=Input() #pixels #range to be defined or we split this into w and h, consider list
+    instrument_bit_depth=Input(validator=Between(min=1, max=24)) #range to be defined (1-24) Check gs for inputvalidator
 
     @Attribute
     def pixel_count(self):
-        pass
+        return(self.instrument_image_height*self.instrument_image_width)
 
     @Attribute
     def instrument_data_rate(self):
