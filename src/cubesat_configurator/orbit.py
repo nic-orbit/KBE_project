@@ -2,15 +2,44 @@ from parapy.core import *
 from parapy.geom import *
 import numpy as np
 import pykep as pk
+from typing import cast
+from parapy.core.validate import OneOf, LessThan, GreaterThan, GreaterThanOrEqualTo, IsInstance, Range, AdaptedValidator
+from cubesat_configurator.custom_validators import altitude_validator
 
 
 class Orbit(Base):
     altitude = Input() # km
-    inclination = Input() # deg
     eccentricity = Input(0) # dimensionless
     RAAN = Input(0) # deg
     argument_of_periapsis = Input(0) # deg
     true_anomaly = Input(0) # deg
+
+    @altitude.validator
+    def altitude(self, value):
+        """
+        Validator for the altitude input of Orbit class. The altitude must higher then 100 km and lower than 2000 km.
+        """
+        if value < 100:
+            print(
+                  "The altitude must be higher than 150 km. \n"
+                  f"Current value: {value} km, please increase GSD or adjust instrument characteristics (e.g. focal length or pixel size).\n"
+                  "Formula: h [km] = (GSD [m] / (pixel_size [µm] * 10**-6) ) * focal_length [mm] * 10**-6  "
+                  )
+            return False
+        if value > 2000:
+            print(
+                  "The altitude must be lower than 2000 km. \n"
+                  f"Current value: {value} km, please decrease GSD or adjust instrument characteristics (e.g. focal length or pixel size).\n"
+                  "Formula: h [km] = (GSD [m] / (pixel_size [µm] * 10**-6) ) * focal_length [mm] * 10**-6  "
+                  )
+            return False
+        return True
+
+    
+    @Attribute
+    def inclination(self):
+        inc_SSO = np.round(0.0087033*self.altitude+90.2442419, 2) # deg, derived from linear regression of SSO altitudes and inclinations from wikipedia
+        return 90 if self.parent.parent.orbit_type == "Polar" else inc_SSO if self.parent.parent.orbit_type == "SSO" else 0 if self.parent.parent.orbit_type == "Equatorial" else self.parent.parent.custom_inclination
 
     @Attribute
     def apoapsis(self):
@@ -54,6 +83,7 @@ class Orbit(Base):
     
     def __str__(self):
         return ("------ Orbit ------  \n"
+                f"altitude: {self.altitude} km\n"
                 # print keplerian elements
                 f"semi-major axis: {self.semi_major_axis} m\n"
                 f"inclination: {self.inclination} deg\n"

@@ -1,0 +1,22 @@
+digraph "packages" {
+rankdir=BT
+charset="utf-8"
+"src" [color="black", label=<src>, shape="box", style="solid"];
+"src.cubesat_configurator" [color="black", label=<src.cubesat_configurator>, shape="box", style="solid"];
+"src.cubesat_configurator.constants" [color="black", label=<src.cubesat_configurator.constants>, shape="box", style="solid"];
+"src.cubesat_configurator.cubesat" [color="black", label=<src.cubesat_configurator.cubesat>, shape="box", style="solid"];
+"src.cubesat_configurator.custom_validators" [color="black", label=<src.cubesat_configurator.custom_validators>, shape="box", style="solid"];
+"src.cubesat_configurator.groundstation" [color="black", label=<src.cubesat_configurator.groundstation>, shape="box", style="solid"];
+"src.cubesat_configurator.mission" [color="black", label=<src.cubesat_configurator.mission>, shape="box", style="solid"];
+"src.cubesat_configurator.orbit" [color="black", label=<src.cubesat_configurator.orbit>, shape="box", style="solid"];
+"src.cubesat_configurator.paseos_parser" [color="black", label=<src.cubesat_configurator.paseos_parser>, shape="box", style="solid"];
+"src.cubesat_configurator.subsystem" [color="black", label=<src.cubesat_configurator.subsystem>, shape="box", style="solid"];
+"src.cubesat_configurator.subsystems" [color="black", label=<src.cubesat_configurator.subsystems>, shape="box", style="solid"];
+"src.main" [color="black", label=<src.main>, shape="box", style="solid"];
+"src.cubesat_configurator" -> "src.cubesat_configurator.cubesat" [arrowhead="open", arrowtail="none"];
+"src.cubesat_configurator" -> "src.cubesat_configurator.groundstation" [arrowhead="open", arrowtail="none"];
+"src.cubesat_configurator" -> "src.cubesat_configurator.mission" [arrowhead="open", arrowtail="none"];
+"src.cubesat_configurator" -> "src.cubesat_configurator.orbit" [arrowhead="open", arrowtail="none"];
+"src.cubesat_configurator" -> "src.cubesat_configurator.subsystems" [arrowhead="open", arrowtail="none"];
+"src.main" -> "src.cubesat_configurator.mission" [arrowhead="open", arrowtail="none"];
+}

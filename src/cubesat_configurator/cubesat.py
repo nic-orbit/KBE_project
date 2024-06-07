@@ -1,41 +1,32 @@
 from parapy.core import *
 from parapy.geom import *
-from parapy.core.validate import OneOf, LessThan, GreaterThan, GreaterThanOrEqualTo, IsInstance
-import subsystems as subsys
-import subsystem as ac
+from parapy.core.validate import OneOf, LessThan, GreaterThan, GreaterThanOrEqualTo, IsInstance, Range
+from cubesat_configurator import subsystems as subsys
+from cubesat_configurator import subsystem as ac
 import numpy as np
 import pykep as pk
 import yaml
 import os
 from pprint import pprint
-import paseos_parser as pp
+from cubesat_configurator import paseos_parser as pp
 import paseos
 from paseos import ActorBuilder, SpacecraftActor, GroundstationActor
-import constants
-from orbit import Orbit
+from cubesat_configurator import constants
+from cubesat_configurator.orbit import Orbit
 
 
 
 
 class CubeSat(GeomBase):
-    orbit_altitude = Input() # km
+    cost_factor = Input(0, validator=Range(0, 1))
+    mass_factor = Input(0, validator=Range(0, 1))
+    power_factor = Input(0, validator=Range(0, 1))
 
-    @Attribute
-    def system_data_rate(self):
-
-        return self.payload.instrument_data_rate*constants.SystemConfig.system__margin # assume 5% of additional bus data rate, has to be changed
-    
-    @Attribute
-    def min_downlink_data_rate(self):
-        return self.system_data_rate/(self.simulate_first_orbit["comm_window_fraction"])
-
-    @Attribute 
-    def orbit(self):
-        return Orbit(altitude=self.orbit_altitude,
-                inclination=self.parent.orbit_inclination)
-    
     @Attribute
     def total_mass(self): # Do we need overall mass and power using a margin first?
+        """
+        Calculate the total mass of the CubeSat based on the mass of the subsystems (bottom-up approach) for final reporting. 
+        """
         mass = 0
         for child in self.children:
             if isinstance(child, ac.Subsystem):
@@ -44,13 +35,40 @@ class CubeSat(GeomBase):
 
     @Attribute
     def total_power_consumption(self):
+        """
+        Calculate the total power consumption of the CubeSat based on the average power consumption of the subsystems (bottom-up approach) for final reporting. 
+        """
         power = 0
         for child in self.children:
             if isinstance(child, ac.Subsystem):
                 power += child.power
         return power
+
+    @Attribute
+    def system_data_rate(self):
+        """
+        Calculate the system data rate based on the payload data rate and the margin.
+        Assumes that the payload data rate is significantly the highest data rate in the system, which is to be expected for Earth Observation applications.
+        Also assumes that the system margin covers the satellite bus data rate. 
+        """
+        return self.payload.instrument_data_rate*(1 + constants.SystemConfig.system_margin) # kbps
     
-    #Try to implement separately for each subsystem
+    @Attribute
+    def min_downlink_data_rate(self):
+        """
+        Calculate the minimum required downlink data rate based on the system data rate and the communication window fraction.
+        DLDR = System Data Rate / Communication Window Fraction of the orbit
+        """
+        return self.system_data_rate/(self.simulate_first_orbit["comm_window_fraction"]) * (1+constants.SystemConfig.system_margin) # kbps
+
+    @Part 
+    def orbit(self):
+        """
+        Returns an instance of the Orbit class with the maximum allowed orbital altitude from the mission as input.
+        """
+        return Orbit(altitude=self.parent.max_orbit_altitude)
+    
+    #to be deleted! - Try to implement separately for each subsystem
     @Attribute
     def subsystem_dict(self):
         # Get the current directory of the script
@@ -85,7 +103,7 @@ class CubeSat(GeomBase):
         Simulates the first run of paseos for a day to get communication windows and eclipse times. 
         """
         verbose = False
-        plotting = True
+        plotting = False
         # Things that will be calculated
         eclipse_time = 0
 
@@ -216,33 +234,62 @@ class CubeSat(GeomBase):
 
     @Part
     def payload(self):
-        return subsys.Payload(width=self.parent.instrument_width,
-                       height=self.parent.instrument_height,
-                       length=self.parent.instrument_length,
-                       mass=self.parent.instrument_mass,
-                       power=self.parent.instrument_power_consumption
-                       )
+        """
+        Returns an instance of the Payload class.
+        """
+        return subsys.Payload(instrument_min_operating_temp=-10, # deg C
+                              instrument_max_operating_temp=50, # deg C
+                              instrument_focal_length=40, # mm
+                              instrument_pixel_size=7,  # µm - Typical values for industrial cameras range from 1.5 to 15 µm ( bigger --> better SNR, but larger (worse) GSD )
+                              instrument_power_consumption=10, # W
+                              instrument_mass=0.5, # kg
+                              instrument_height=50, # mm
+                              instrument_width=100, # mm
+                              instrument_length=100, # mm
+                              instrument_cost=10000, # USD
+                              instrument_images_per_day=1, #number
+                              instrument_pixel_resolution=[1280, 720], #range to be defined or we split this into w and h, consider list
+                              instrument_bit_depth=8 #range to be defined (1-24) Check gs for inputvalidator
+                              )
     
     @Part
     def communication(self):
+        """
+        Returns an instance of the COMM class.
+        """
         return subsys.COMM()
     
     @Part
     def power(self):
+        """
+        Returns an instance of the EPS class.
+        """
         return subsys.EPS()
     
     @Part
     def obc(self):
+        """
+        Returns an instance of the OBC class.
+        """
         return subsys.OBC()
     
     @Part
-    def aocs(self):
-        return subsys.AOCS()
+    def adcs(self):
+        """
+        Returns an instance of the ADCS class.
+        """
+        return subsys.ADCS()
     
     @Part
     def structure(self):
+        """
+        Returns an instance of the Structure class.
+        """
         return subsys.Structure()
 
     @Part
     def thermal(self):
+        """
+        Returns an instance of the Thermal class.
+        """
         return subsys.Thermal()

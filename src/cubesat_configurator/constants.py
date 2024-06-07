@@ -8,4 +8,4 @@ class PaseosConfig:
 
 
 class SystemConfig:
-    system__margin = 0.2
+    system_margin = 0.2

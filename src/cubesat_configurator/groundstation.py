@@ -9,8 +9,4 @@ class GroundStation(Base):
     company = Input()
     location = Input()
     number=Input()
-
-    @Attribute
-    def name(self):
-        # name is a combination of index and location
-        return f"GS_{self.number} ({self.location})"
+    name = Input()
