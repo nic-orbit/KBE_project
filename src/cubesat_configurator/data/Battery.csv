@@ -1,4 +1,4 @@
-index,Company,Power(W),Mass(g),Cost,Height
+index,Company,Power,Mass,Cost,Height
 1,AMUN,30,200,9300,20
 2,Solo PM4,100,350,15000,50
 3,ICEPS2,28.8,184,7300,26.5

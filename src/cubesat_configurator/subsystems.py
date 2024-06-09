@@ -286,11 +286,11 @@ class EPS(ac.Subsystem):
                 # Add the row to the list of selected options as a dictionary
                 bat_list.append({
                     'index': index,
-                    'Form_factor': row['Form_factor'],
-                    'Type': row['Type'],
+                    'Company': row['Company'],
                     'Power': row['Power'],
                     'Mass': row['Mass'],
                     'Cost': row['Cost'],
+                    'Height':row['Height'],
                     'Score': score
                 })
 
