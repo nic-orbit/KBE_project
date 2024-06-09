@@ -259,8 +259,7 @@ class CubeSat(GeomBase):
                               instrument_length=100, # mm
                               instrument_cost=10000, # USD
                               instrument_images_per_day=1, #number
-                              instrument_image_width=1260, #pixels
-                              instrument_image_height=1260, #pixels 
+                              instrument_pixel_resolution = [1260, 1260], # pixels
                               instrument_bit_depth=8 #range to be defined (1-24) Check gs for inputvalidator
                               )
     
