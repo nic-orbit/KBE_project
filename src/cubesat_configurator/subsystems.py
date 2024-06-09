@@ -63,7 +63,49 @@ class Payload(ac.Subsystem):
 
 class ADCS(ac.Subsystem):
     required_pointing_accuracy = ac.Input()  # deg
-    pass
+    def read_comm_from_csv(self):
+        """Read communication subsystem data from CSV."""
+        script_dir = os.path.dirname(__file__)
+        relative_path = os.path.join('data', 'ADCS.csv')
+        cs_info_path = os.path.join(script_dir, relative_path)
+        return pd.read_csv(cs_info_path)
+    
+    @Attribute
+    def adcs_selection(self):
+        """Select communication subsystem based on payload requirements."""
+        adcs = self.read_comm_from_csv()
+        adcs_list = []
+
+        for index, row in adcs.iterrows():
+            # Compare the data rate value from the CSV with the user-provided data rate
+            if row['Pointing_Accuracy'] > self.required_pointing_accuracy:
+                # Score calculation
+                score = (
+                    row['Mass'] * self.parent.mass_factor*0.001 +
+                    row['Cost'] * self.parent.cost_factor +
+                    row['Power'] * self.parent.power_factor
+                )
+                # Add the row to the list of selected options as a dictionary
+                adcs_list.append({
+                    'index': index,
+                    'Company': row['Company'],
+                    'Data_Rate': row['Data_Rate'],
+                    'Power': row['Power'],
+                    'Mass': row['Mass'],
+                    'Height': row['Height'],
+                    'Cost': row['Cost'],
+                    'Score': score
+                })
+
+        if len(adcs_list) == 0:
+            # Check if any of the components match the requirement and display error 
+            raise ValueError("No suitable component found for ADCS")
+
+        # Choose the component with the smallest score
+        adcs_selection = min(adcs_list, key=lambda x: x['Score'])
+
+        return adcs_selection
+    
 
 
 class COMM(ac.Subsystem):
@@ -85,7 +127,7 @@ class COMM(ac.Subsystem):
             if row['Data_Rate'] > self.payload.instrument_data_rate:
                 # Score calculation
                 score = (
-                    row['Mass'] * self.parent.mass_factor +
+                    row['Mass'] * self.parent.mass_factor *0.001+
                     row['Cost'] * self.parent.cost_factor +
                     row['Power'] * self.parent.power_factor
                 )
@@ -131,7 +173,7 @@ def obc_selection(self):
             if row['Storage'] > self.required_onboard_data_storage:
                 # Score calculation
                 score = (
-                    row['Mass'] * self.parent.mass_factor +
+                    row['Mass'] * self.parent.mass_factor* 0.001 +
                     row['Cost'] * self.parent.cost_factor +
                     row['Power'] * self.parent.power_factor * 0.001
                 )
@@ -149,7 +191,7 @@ def obc_selection(self):
 
     if len(obc_list) == 0:
             # Check if any of the components match the requirement and display error 
-            raise ValueError("No suitable component found for Communication Subsystem")
+            raise ValueError("No suitable component found for OBC Subsystem")
 
     # Choose the component with the smallest score
     obc_selection = min(obc_list, key=lambda x: x['Score'])

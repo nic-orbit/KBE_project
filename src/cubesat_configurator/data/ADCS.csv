@@ -1,0 +1,6 @@
+index,Company,Pointing_Accuracy,Power,Mass,Height,Cost
+1,CubeADCS 3-Axis Small,0.2,2,500,57,43500
+2,iADCS200,0.3,1.4,400,32,50000
+3,iADCS400,0.02,2,1150,67,100000
+4,ARCUS_ADCS,0.11,1.2,715,50,60000
+5,Tensor_Tech_ADCS-MTQ,9,0.8,140,20,6900
