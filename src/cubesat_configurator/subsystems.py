@@ -27,8 +27,8 @@ class Payload(ac.Subsystem):
     ### maybe we can delete these and use just height, width and length?
     # I feel like images per day should be on mission level?
     instrument_images_per_day=Input() # number
-    instrument_image_width=Input()
-    instrument_image_length=Input()
+    # instrument_image_width=Input()
+    # instrument_image_length=Input()
     instrument_pixel_resolution=Input() # range to be defined or we split this into w and h, consider list
     instrument_bit_depth=Input() #range to be defined (1-24) Check gs for inputvalidator
     
@@ -61,23 +61,103 @@ class Payload(ac.Subsystem):
         """
         return ( self.pixel_count*self.instrument_bit_depth*self.instrument_images_per_day ) / ( self.parent.orbit.period * 1000 ) # kbps
 
-class OBC(ac.Subsystem):
-    required_onboard_data_storage = Input() # this value needs to come from paseos simulation
-    pass
-
-
-class EPS(ac.Subsystem):
-    pass
-
-
 class ADCS(ac.Subsystem):
-    required_pointing_accuracy = Input() # deg
+    required_pointing_accuracy = ac.Input()  # deg
     pass
 
 
 class COMM(ac.Subsystem):
-    pass
+    def read_comm_from_csv(self):
+        """Read communication subsystem data from CSV."""
+        script_dir = os.path.dirname(__file__)
+        relative_path = os.path.join('data', 'Communication_subsystem.csv')
+        cs_info_path = os.path.join(script_dir, relative_path)
+        return pd.read_csv(cs_info_path)
+    
+    @Attribute
+    def comm_selection(self):
+        """Select communication subsystem based on payload requirements."""
+        comm = self.read_comm_from_csv()
+        comm_list = []
 
+        for index, row in comm.iterrows():
+            # Compare the data rate value from the CSV with the user-provided data rate
+            if row['Data_Rate'] > self.payload.instrument_data_rate:
+                # Score calculation
+                score = (
+                    row['Mass'] * self.parent.mass_factor +
+                    row['Cost'] * self.parent.cost_factor +
+                    row['Power'] * self.parent.power_factor
+                )
+                # Add the row to the list of selected options as a dictionary
+                comm_list.append({
+                    'index': index,
+                    'Company': row['Company'],
+                    'Data_Rate': row['Data_Rate'],
+                    'Power': row['Power'],
+                    'Mass': row['Mass'],
+                    'Height': row['Height'],
+                    'Cost': row['Cost'],
+                    'Score': score
+                })
+
+        if len(comm_list) == 0:
+            # Check if any of the components match the requirement and display error 
+            raise ValueError("No suitable component found for Communication Subsystem")
+
+        # Choose the component with the smallest score
+        comm_selection = min(comm_list, key=lambda x: x['Score'])
+
+        return comm_selection
+
+class OBC(ac.Subsystem):
+    required_onboard_data_storage = ac.Input()  # Value needs to come from PASEOS simulation (GB)
+
+def read_obc_from_csv(self):
+        """Read communication subsystem data from CSV."""
+        script_dir = os.path.dirname(__file__)
+        relative_path = os.path.join('data', 'OBC.csv')
+        cs_info_path = os.path.join(script_dir, relative_path)
+        return pd.read_csv(cs_info_path)
+    
+@Attribute
+def obc_selection(self):
+    """Select communication subsystem based on payload requirements."""
+    obc = self.read_OBC_from_csv()
+    obc_list = []
+
+    for index, row in obc.iterrows():
+            # Compare the data rate value from the CSV with the user-provided data rate
+            if row['Storage'] > self.required_onboard_data_storage:
+                # Score calculation
+                score = (
+                    row['Mass'] * self.parent.mass_factor +
+                    row['Cost'] * self.parent.cost_factor +
+                    row['Power'] * self.parent.power_factor * 0.001
+                )
+                # Add the row to the list of selected options as a dictionary
+                obc_list.append({
+                    'index': index,
+                    'Company': row['Company'],
+                    'Data_Rate': row['Data_Rate'],
+                    'Power': row['Power'],
+                    'Mass': row['Mass'],
+                    'Height': row['Height'],
+                    'Cost': row['Cost'],
+                    'Score': score
+                })
+
+    if len(obc_list) == 0:
+            # Check if any of the components match the requirement and display error 
+            raise ValueError("No suitable component found for Communication Subsystem")
+
+    # Choose the component with the smallest score
+    obc_selection = min(obc_list, key=lambda x: x['Score'])
+
+    return obc_selection
+
+class EPS(ac.Subsystem):
+    pass
 
 class Structure(ac.Subsystem):
     pass
@@ -90,64 +170,6 @@ class Thermal(ac.Subsystem):
 
 
 
-from parapy.core import *
-from parapy.geom import *
-from parapy.core.validate import OneOf, LessThan, GreaterThan, GreaterThanOrEqualTo, IsInstance, Between
-import subsystem as ac
-    
-
-class Payload(ac.Subsystem):
-    #instrument requirements
-    instrument_min_operating_temp = Input() # deg C
-    instrument_max_operating_temp = Input() # deg C
-    #instrument characteristics
-    instrument_focal_length = Input() # mm
-    instrument_pixel_size = Input() # µm
-    instrument_power_consumption = Input() # W
-    instrument_mass = Input() # kg
-    instrument_height = Input() # mm
-    instrument_width = Input() # mm
-    instrument_length = Input() # mm
-    instrument_cost = Input() # USD
-    instrument_images_per_day=Input() #number
-    instrument_image_width=Input() #pixels
-    instrument_image_height=Input() #pixels #range to be defined or we split this into w and h, consider list
-    instrument_bit_depth=Input(validator=Between(limit1=1, limit2=24)) #range to be defined (1-24) Check gs for inputvalidator
-
-    @Attribute
-    def pixel_count(self):
-        return(self.instrument_image_height*self.instrument_image_width)
-
-    @Attribute
-    def instrument_data_rate(self):
-        return (self.pixel_count*self.instrument_bit_depth*self.instrument_images_per_day)/8000
-
-class COMM(ac.Subsystem):
-    def read_comm_from_csv(self):
-        # Get the current directory of the script
-        script_d1 = os.path.dirname(__file__)
-        relative_path = os.path.join('data', 'Communication_subsystem.csv')
-
-        # Construct the full relative file path
-        cs_info_path = os.path.join(script_d1, relative_path)
-
-        all_cs_import = pd.read_csv(cs_info_path)
-        return all_cs_import
-    
-    
-
-
-
-class OBC(ac.Subsystem):
-    pass
-
-
-class EPS(ac.Subsystem):
-    pass
-
-
-class ADCS(ac.Subsystem):
-    pass
 
 
 
