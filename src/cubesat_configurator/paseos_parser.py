@@ -168,7 +168,7 @@ def set_ground_station(epoch, simulation, ground_stations:Sequence):
             latitude=station.latitude,
             longitude=station.longitude,
             elevation=station.elevation,
-            minimum_altitude_angle=5,
+            minimum_altitude_angle=10,
         )
         # add the gs to simulation
         simulation.add_known_actor(locals()[station.name])
