@@ -31,6 +31,7 @@ class Mission(GeomBase):
     #mission requirements
     mission_lifetime = Input(doc="Mission Lifetime in months") # months
     reqiured_GSD = Input() # m
+    number_of_images_per_day = Input() # number
     orbit_type = Input() # SSO, Polar, Equatorial, custom
     custom_inclination = Input(0) # deg 
     # Ground Stations selection
