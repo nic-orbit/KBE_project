@@ -16,7 +16,6 @@ from cubesat_configurator.orbit import Orbit
 
 
 
-
 class CubeSat(GeomBase):
     cost_factor = Input(0, validator=Range(0, 1))
     mass_factor = Input(0, validator=Range(0, 1))
@@ -145,6 +144,17 @@ class CubeSat(GeomBase):
 
         if plotting:
             plotter = paseos.plot(sim, paseos.PlotType.SpacePlot)
+
+        simulation_inputs = {
+            "simulation_start": t0,
+            "simulation_duration": pk.DAY2SEC,
+            "orbits_to_simulate": orbits_to_simulate,
+            "runs": runs,
+            "dt": dt,
+            "altitude": self.orbit.altitude,
+            "period": T,
+            "N_ground_stations": len(used_gs_info_list),
+        }
         
         # print simulation parameters
         if verbose:
@@ -182,6 +192,7 @@ class CubeSat(GeomBase):
 
         # RESULTS
         simulation_results = {
+            "simulation_inputs": simulation_inputs,
             "simulation_start": t0,
             "simulation_end": sat_actor.local_time,
             "simulation_duration": round((sat_actor.local_time.mjd2000 - t0.mjd2000)*pk.DAY2SEC,1),

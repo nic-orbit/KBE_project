@@ -2,6 +2,7 @@ from parapy.core import *
 from parapy.geom import *
 from parapy.core.validate import OneOf, LessThan, GreaterThan, GreaterThanOrEqualTo, Range
 from cubesat_configurator import subsystem as ac
+import pykep as pk
 
 
 class Payload(ac.Subsystem):
@@ -50,7 +51,7 @@ class Payload(ac.Subsystem):
         Payload data rate calculation based on the instrument characteristics.
         PLDR = (Number_of_pixels * Bit_depth * Number_of_images_per_day) / orbital_period   [kbps]
         """
-        return ( self.pixel_count*self.instrument_bit_depth*self.instrument_images_per_day ) / ( self.parent.orbit.period * 1000 ) # kbps
+        return ( self.pixel_count*self.instrument_bit_depth*self.instrument_images_per_day ) / ( pk.DAY2SEC * 1000 ) # kbps
 
 class OBC(ac.Subsystem):
     required_onboard_data_storage = Input() # this value needs to come from paseos simulation
