@@ -1,6 +1,6 @@
 from parapy.core import *
 from parapy.geom import *
-from parapy.core.validate import OneOf, LessThan, GreaterThan, GreaterThanOrEqualTo
+from parapy.core.validate import OneOf, LessThan, GreaterThan, GreaterThanOrEqualTo, IsInstance
 from cubesat_configurator import subsystem as ac
 import pandas as pd
 import os
@@ -169,27 +169,27 @@ class COMM(ac.Subsystem):
 class OBC(ac.Subsystem):
     required_onboard_data_storage = Input()  # Value needs to come from PASEOS simulation (GB)
 
-def read_obc_from_csv(self):
-        """Read communication subsystem data from CSV."""
+    def read_obc_from_csv(self):
+        """Read OBC subsystem data from CSV."""
         script_dir = os.path.dirname(__file__)
         relative_path = os.path.join('data', 'OBC.csv')
-        cs_info_path = os.path.join(script_dir, relative_path)
-        return pd.read_csv(cs_info_path)
+        obc_info_path = os.path.join(script_dir, relative_path)
+        return pd.read_csv(obc_info_path)
     
-@Attribute
-def obc_selection(self):
-    """Select communication subsystem based on payload requirements."""
-    obc = self.read_OBC_from_csv()
-    obc_list = []
+    @Attribute
+    def obc_selection(self):
+        """Select OBC subsystem based on payload requirements."""
+        obc = self.read_OBC_from_csv()
+        obc_list = []
 
-    for index, row in obc.iterrows():
+        for index, row in obc.iterrows():
             # Compare the data rate value from the CSV with the user-provided data rate
             if row['Storage'] > self.required_onboard_data_storage:
                 # Score calculation
                 score = (
-                    row['Mass'] * self.parent.mass_factor* 0.001 +
-                    row['Cost'] * self.parent.cost_factor +
-                    row['Power'] * self.parent.power_factor * 0.001
+                    int(row['Mass']) * self.parent.mass_factor* 0.001 +
+                    int(row['Cost']) * self.parent.cost_factor +
+                    int(row['Power']) * self.parent.power_factor * 0.001
                 )
                 # Add the row to the list of selected options as a dictionary
                 obc_list.append({
@@ -203,17 +203,119 @@ def obc_selection(self):
                     'Score': score
                 })
 
-    if len(obc_list) == 0:
+        if len(obc_list) == 0:
             # Check if any of the components match the requirement and display error 
             raise ValueError("No suitable component found for OBC Subsystem")
 
-    # Choose the component with the smallest score
-    obc_selection = min(obc_list, key=lambda x: x['Score'])
+        # Choose the component with the smallest score
+        obc_selection = min(obc_list, key=lambda x: x['Score'])
 
-    return obc_selection
+        return obc_selection
 
 class EPS(ac.Subsystem):
-    pass
+    Solar_panel_type = Input(validator=IsInstance(['Body-mounted', 'Deployable']), default='Body-mounted')
+
+    def read_sp_from_csv(self):
+        """Read Solar Panels data from CSV."""
+        script_dir = os.path.dirname(__file__)
+        relative_path = os.path.join('data', 'Solar_Panel.csv')
+        sp_info_path = os.path.join(script_dir, relative_path)
+        return pd.read_csv(sp_info_path)
+    
+    def read_bat_from_csv(self):
+        """Read Battery data from CSV."""
+        script_dir = os.path.dirname(__file__)
+        relative_path = os.path.join('data', 'Battery.csv')
+        bat_info_path = os.path.join(script_dir, relative_path)
+        return pd.read_csv(bat_info_path)
+    
+    @Attribute
+    def avg_power_comm(self):
+        comm_selection_list=self.comm_selection
+        avg_power_comm=0
+        for row in comm_selection_list:
+            power_comm=row['Power_DL']*(tgs/24)+row['Power_Nom']*(1-(tgs/24))
+            avg_power_comm+=power_comm
+        return(avg_power_comm)
+    
+    @Attribute
+    def total_power_required(self):
+        obc_selection_list=self.obc_selection
+        adcs_selection_list=self.adcs_selection
+        total_power=(self.avg_power_comm + obc_selection_list['Power'] + adcs_selection_list['Power'] + self.instrument_power_consumption)*1.1
+        return(total_power)
+
+    
+    @Attribute
+    def solar_panel_selection(self):
+        """Select Solar Panels based on payload requirements."""
+        sp = self.read_sp_from_csv()
+        solar_panel_power_req=self.total_power_required*(time_period)/(1-eclipse_time)
+        sp_list = []
+        for index, row in sp.iterrows():
+            # Compare the data rate value from the CSV with the user-provided data rate
+            if row['Power'] > self.solar_panel_power_req and row['Type'] == self.Solar_panel_type:
+                # Score calculation
+                score = (
+                    int(row['Mass']) * self.parent.mass_factor* 0.001 +
+                    int(row['Cost']) * self.parent.cost_factor +
+                    int(row['Power']) * self.parent.power_factor
+                )
+                # Add the row to the list of selected options as a dictionary
+                sp_list.append({
+                    'index': index,
+                    'Form_factor': row['Form_factor'],
+                    'Type': row['Type'],
+                    'Power': row['Power'],
+                    'Mass': row['Mass'],
+                    'Cost': row['Cost'],
+                    'Score': score
+                })
+
+        if len(sp_list) == 0:
+            # Check if any of the components match the requirement and display error 
+            raise ValueError("No suitable component found for Solar Panels")
+
+        # Choose the component with the smallest score
+        sp_selection = min(sp_list, key=lambda x: x['Score'])
+
+        return sp_selection
+
+    @Attribute
+    def battery_selection(self):
+        """Select Solar Panels based on payload requirements."""
+        bat = self.read_bat_from_csv()
+        battery_power_req=self.total_power_required*(time_period)/(eclipse_time)
+        bat_list = []
+        for index, row in bat.iterrows():
+            # Compare the data rate value from the CSV with the user-provided data rate
+            if row['Power'] > self.battery_power_req:
+                # Score calculation
+                score = (
+                    int(row['Mass']) * self.parent.mass_factor* 0.001 +
+                    int(row['Cost']) * self.parent.cost_factor +
+                    int(row['Power']) * self.parent.power_factor
+                )
+                # Add the row to the list of selected options as a dictionary
+                bat_list.append({
+                    'index': index,
+                    'Company': row['Company'],
+                    'Power': row['Power'],
+                    'Mass': row['Mass'],
+                    'Cost': row['Cost'],
+                    'Height':row['Height'],
+                    'Score': score
+                })
+
+        if len(bat_list) == 0:
+            # Check if any of the components match the requirement and display error 
+            raise ValueError("No suitable component found for Batteries")
+
+        # Choose the component with the smallest score
+        bat_selection = min(bat_list, key=lambda x: x['Score'])
+
+        return bat_selection
+
 
 class Structure(ac.Subsystem):
     pass
