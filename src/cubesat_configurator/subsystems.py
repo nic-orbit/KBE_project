@@ -8,6 +8,7 @@ from cubesat_configurator import subsystem as ac
 import pandas as pd
 import os
 import pykep as pk
+from cubesat_configurator import constants
 
 
 class Payload(ac.Subsystem):
@@ -76,62 +77,42 @@ class Payload(ac.Subsystem):
         """
         instrument_data_per_day = self.image_size*self.instrument_images_per_day # kbits
         return ( instrument_data_per_day ) / ( pk.DAY2SEC ) # kbps
-
+#Done for now
 class ADCS(ac.Subsystem):
-    required_pointing_accuracy = ac.Input()  # deg
-    def read_comm_from_csv(self):
-        """Read communication subsystem data from CSV."""
-        script_dir = os.path.dirname(__file__)
-        relative_path = os.path.join('data', 'ADCS.csv')
-        cs_info_path = os.path.join(script_dir, relative_path)
-        return pd.read_csv(cs_info_path)
+    required_pointing_accuracy = Input()  # deg
+
+    @required_pointing_accuracy.validator
+    def required_pointing_accuracy_validator(self, value):
+        if value < 0:
+            msg =  self.requirement_key + " cannot be negative"
+            return False, msg
+        
+        adcs_df = self.read_adcs_from_csv
+        # find minimum Pointing Accuracy value from the CSV
+        min_pa = adcs_df[self.requirement_key].min()
+        if value < min_pa:
+            msg = "Required " + self.requirement_key + f" cannot be lower than {min_pa} deg, because it is the minimum value in the database."
+            return False, msg
+        return True
+    
+    requirement_key = 'Pointing_Accuracy'
     
     @Attribute
+    def read_adcs_from_csv(self):
+        return self.read_subsystems_from_csv('ADCS.csv')
+
+    @Attribute
     def adcs_selection(self):
-        """Select communication subsystem based on payload requirements."""
-        adcs = self.read_comm_from_csv()
-        adcs_list = []
+        """Select ADCS subsystem based on payload requirements."""
+        adcs = self.read_adcs_from_csv
+        selected = self.component_selection(adcs, self.requirement_key,  self.required_pointing_accuracy, 'less')
 
-        for index, row in adcs.iterrows():
-            # Compare the data rate value from the CSV with the user-provided data rate
-            if row['Pointing_Accuracy'] > self.required_pointing_accuracy:
-                # Score calculation
-                score = (
-                    row['Mass'] * self.parent.mass_factor*0.001 +
-                    row['Cost'] * self.parent.cost_factor +
-                    row['Power'] * self.parent.power_factor
-                )
-                # Add the row to the list of selected options as a dictionary
-                adcs_list.append({
-                    'index': index,
-                    'Company': row['Company'],
-                    'Data_Rate': row['Data_Rate'],
-                    'Power': row['Power'],
-                    'Mass': row['Mass'],
-                    'Height': row['Height'],
-                    'Cost': row['Cost'],
-                    'Score': score
-                })
-
-        if len(adcs_list) == 0:
-            # Check if any of the components match the requirement and display error 
-            raise ValueError("No suitable component found for ADCS")
-
-        # Choose the component with the smallest score
-        adcs_selection = min(adcs_list, key=lambda x: x['Score'])
-
-        return adcs_selection
+        return selected
     
-
-
 class COMM(ac.Subsystem):
     # required_downlink_data_rate = Input()  # kbps
     def read_comm_from_csv(self):
-        """Read communication subsystem data from CSV."""
-        script_dir = os.path.dirname(__file__)
-        relative_path = os.path.join('data', 'Communication_subsystem.csv')
-        cs_info_path = os.path.join(script_dir, relative_path)
-        return pd.read_csv(cs_info_path)
+        return self.read_subsystems_from_csv('Communication_subsystem.csv')
     
     @Attribute
     def comm_selection(self):
@@ -168,7 +149,9 @@ class COMM(ac.Subsystem):
         comm_selection = min(comm_list, key=lambda x: x['Score'])
 
         return comm_selection
+    
 
+#Done for now
 class OBC(ac.Subsystem):
     required_onboard_data_storage = Input()  # Value needs to come from PASEOS simulation (GB)
 
@@ -184,78 +167,33 @@ class OBC(ac.Subsystem):
         if value > max_storage:
             msg = f"Required onboard data storage cannot exceed {max_storage} GB, because it is the maximum value in the database."
             return False, msg
-        
         return True
     
     def read_obc_from_csv(self):
         return self.read_subsystems_from_csv('OBC.csv')
 
-    # def read_obc_from_csv(self):
-    #     """Read OBC subsystem data from CSV."""
-    #     script_dir = os.path.dirname(__file__)
-    #     relative_path = os.path.join('data', 'OBC.csv')
-    #     obc_info_path = os.path.join(script_dir, relative_path)
-    #     return pd.read_csv(obc_info_path)
-    
     @Attribute
     def obc_selection(self):
         """Select OBC subsystem based on payload requirements."""
         obc = self.read_obc_from_csv()
-        obc_list = []
-
-        for index, row in obc.iterrows():
-            # Compare the data rate value from the CSV with the user-provided data rate
-            if row['Storage'] > self.required_onboard_data_storage:
-                # Score calculation
-                score = (
-                    int(row['Mass']) * self.parent.mass_factor* 0.001 +
-                    int(row['Cost']) * self.parent.cost_factor +
-                    int(row['Power']) * self.parent.power_factor * 0.001
-                )
-                # Add the row to the list of selected options as a dictionary
-                obc_list.append({
-                    'index': index,
-                    'Company': row['Company'],
-                    'Storage': row['Storage'],
-                    'Power': row['Power'],
-                    'Mass': row['Mass'],
-                    'Height': row['Height'],
-                    'Cost': row['Cost'],
-                    'Score': score
-                })
-
-        if len(obc_list) == 0:
-            # Check if any of the components match the requirement and display error 
-            raise ValueError("No suitable component found for OBC Subsystem")
-
-        # Choose the component with the smallest score
-        obc_selection = min(obc_list, key=lambda x: x['Score'])
-
-        return obc_selection
+        return self.component_selection(self,obc, 'Storage', self.required_onboard_data_storage)
+    
 
 class EPS(ac.Subsystem):
     # Solar_panel_type = Input(validator=IsInstance(['Body-mounted', 'Deployable']), default='Body-mounted')
     Solar_panel_type = Input(default='Body-mounted', widget=Dropdown(['Body-mounted', 'Deployable']))
         
 
-    def read_sp_from_csv(self):
-        """Read Solar Panels data from CSV."""
-        script_dir = os.path.dirname(__file__)
-        relative_path = os.path.join('data', 'Solar_Panel.csv')
-        sp_info_path = os.path.join(script_dir, relative_path)
-        return pd.read_csv(sp_info_path)
+    def read_SolarPanel_from_csv(self):
+        return self.read_subsystems_from_csv('Solar_Panel.csv')
     
     def read_bat_from_csv(self):
-        """Read Battery data from CSV."""
-        script_dir = os.path.dirname(__file__)
-        relative_path = os.path.join('data', 'Battery.csv')
-        bat_info_path = os.path.join(script_dir, relative_path)
-        return pd.read_csv(bat_info_path)
+        return self.read_subsystems_from_csv('Battery.csv')
     
     @Attribute
     def avg_power_comm(self):
         comm_selection_list=self.comm_selection
-        tgs=ac.Input() #input from Paseos
+        tgs=self.parent.simulate_first_orbit["comm_window_per_day"] #input from Paseos
         avg_power_comm=0
         for row in comm_selection_list:
             power_comm=row['Power_DL']*(tgs/24)+row['Power_Nom']*(1-(tgs/24)) # tgs = communication time per day 
@@ -266,8 +204,8 @@ class EPS(ac.Subsystem):
     def total_power_required(self):
         obc_selection_list=self.obc_selection
         adcs_selection_list=self.adcs_selection
-        total_power=(self.avg_power_comm + obc_selection_list['Power'] + adcs_selection_list['Power'] + self.instrument_power_consumption)*1.1
-        return(total_power)
+        total_power=(self.avg_power_comm + obc_selection_list['Power'] + adcs_selection_list['Power'] + self.parent.payload.instrument_power_consumption)*(1+constants.SystemConfig.system_margin)
+        return (total_power)
 
     
     @Attribute
@@ -280,7 +218,7 @@ class EPS(ac.Subsystem):
         sp_list = []
         for index, row in sp.iterrows():
             # Compare the data rate value from the CSV with the user-provided data rate
-            if row['Power'] > self.solar_panel_power_req and row['Type'] == self.Solar_panel_type:
+            if row['Power'] > solar_panel_power_req and row['Type'] == self.Solar_panel_type:
                 # Score calculation
                 score = (
                     int(row['Mass']) * self.parent.mass_factor* 0.001 +
@@ -317,7 +255,7 @@ class EPS(ac.Subsystem):
         bat_list = []
         for index, row in bat.iterrows():
             # Compare the data rate value from the CSV with the user-provided data rate
-            if row['Power'] > self.battery_power_req:
+            if row['Power'] > battery_power_req:
                 # Score calculation
                 score = (
                     int(row['Mass']) * self.parent.mass_factor* 0.001 +
@@ -347,12 +285,8 @@ class EPS(ac.Subsystem):
 
 class Structure(ac.Subsystem):
 
-    def read_st_from_csv(self):
-        """Read Structural data from CSV."""
-        script_dir = os.path.dirname(__file__)
-        relative_path = os.path.join('data', 'Structure.csv')
-        st_info_path = os.path.join(script_dir, relative_path)
-        return pd.read_csv(st_info_path)
+    def read_struct_from_csv(self):
+        return self.read_subsystems_from_csv('Structure.csv')
 
     @Attribute
     def form_factor(self):
@@ -380,7 +314,7 @@ class Structure(ac.Subsystem):
     def structure(self):
         form_factor_req = self.form_factor
 
-        struct = self.read_st_from_csv()
+        struct = self.read_struct_from_csv()
         struct_selection = []
 
         for index, row in struct.iterrows():

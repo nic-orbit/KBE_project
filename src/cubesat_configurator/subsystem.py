@@ -21,9 +21,58 @@ class Subsystem(GeomBase):
         obc_info_path = os.path.join(script_dir, relative_path)
         return pd.read_csv(obc_info_path)
 
-    @Attribute
-    def score_calculation(self):
-        pass
+    def component_selection(self,component, filter_key, filter_value, comparator='greater'):
+        """Filter components and select the best component based on the score."""
+        filtered_list = []
+
+        # calculate mean and standard deviation of Mass Cost and Power
+        mass_mean = component['Mass'].mean()
+        mass_std = component['Mass'].std()
+        power_mean = component['Power'].mean()
+        power_std = component['Power'].std()
+        cost_mean = component['Cost'].mean()
+        cost_std = component['Cost'].std()
+        
+        for index, row in component.iterrows():
+            if comparator == 'greater':
+                FILTER_CONDITION = row[filter_key] > filter_value
+            else:
+                FILTER_CONDITION = row[filter_key] < filter_value
+            if FILTER_CONDITION:
+                norm_mass = ( row['Mass'] - mass_mean ) / mass_std
+                norm_power = ( row['Power'] - power_mean) / power_std
+                norm_cost = ( row['Cost'] - cost_mean) / cost_std
+                score = (
+                    norm_mass * self.parent.mass_factor +
+                    norm_cost * self.parent.cost_factor +
+                    norm_power * self.parent.power_factor
+                )
+                filtered_list.append({
+                    'index': index,
+                    'Company': row.get('Company',None),
+                    'Data_Rate': row.get('Data_Rate', None), 
+                    'Pointing_Accuracy': row.get('Pointing_Accuracy', None),
+                    'Storage': row.get('Storage', None),
+                    'Form_factor': row.get('Form_factor', None),
+                    'Type': row.get('Type', None),
+                    'Power': row['Power'],
+                    'Mass': row['Mass'],
+                    'Height': row.get('Height'),
+                    'Cost': row['Cost'],
+                    'Score': score
+                })
+        
+        if len(filtered_list) == 0:
+            raise ValueError("No suitable component found based on the criteria.")
+        
+        selected = min(filtered_list, key=lambda x: x['Score'])
+        self.mass = selected["Mass"]
+        self.power = selected["Power"]
+        self.cost = selected["Cost"]
+
+        return selected
+
+    
     
     @Attribute
     def CoM(self):

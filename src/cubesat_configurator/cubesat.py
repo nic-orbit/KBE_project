@@ -22,6 +22,8 @@ class CubeSat(GeomBase):
     mass_factor = Input(0, validator=Range(0, 1))
     power_factor = Input(0, validator=Range(0, 1))
 
+    
+
     @Attribute
     def total_mass(self): # Do we need overall mass and power using a margin first?
         """
@@ -632,7 +634,7 @@ class CubeSat(GeomBase):
         """
         Returns an instance of the ADCS class.
         """
-        return subsys.ADCS()
+        return subsys.ADCS(required_pointing_accuracy=self.parent.req_pointing_accuracy)
     
     @Part
     def structure(self):
