@@ -237,6 +237,7 @@ class EPS(ac.Subsystem):
     @Attribute
     def avg_power_comm(self):
         comm_selection_list=self.comm_selection
+        tgs=ac.Input() #input from Paseos
         avg_power_comm=0
         for row in comm_selection_list:
             power_comm=row['Power_DL']*(tgs/24)+row['Power_Nom']*(1-(tgs/24)) # tgs = communication time per day 
@@ -255,6 +256,8 @@ class EPS(ac.Subsystem):
     def solar_panel_selection(self):
         """Select Solar Panels based on payload requirements."""
         sp = self.read_sp_from_csv()
+        time_period=ac.Input()
+        eclipse_time=ac.Input()
         solar_panel_power_req=self.total_power_required*(time_period)/(1-eclipse_time)
         sp_list = []
         for index, row in sp.iterrows():
@@ -266,7 +269,7 @@ class EPS(ac.Subsystem):
                     int(row['Cost']) * self.parent.cost_factor +
                     int(row['Power']) * self.parent.power_factor
                 )
-                # Add the row to the list of selected options as a dictionary
+                # Add the row to the list of selected options
                 sp_list.append({
                     'index': index,
                     'Form_factor': row['Form_factor'],
@@ -290,6 +293,8 @@ class EPS(ac.Subsystem):
     def battery_selection(self):
         """Select Solar Panels based on payload requirements."""
         bat = self.read_bat_from_csv()
+        time_period=ac.Input()
+        eclipse_time=ac.Input()
         battery_power_req=self.total_power_required*(time_period)/(eclipse_time)
         bat_list = []
         for index, row in bat.iterrows():
@@ -301,7 +306,7 @@ class EPS(ac.Subsystem):
                     int(row['Cost']) * self.parent.cost_factor +
                     int(row['Power']) * self.parent.power_factor
                 )
-                # Add the row to the list of selected options as a dictionary
+                # Add the row to the list of selected options
                 bat_list.append({
                     'index': index,
                     'Company': row['Company'],
@@ -323,8 +328,60 @@ class EPS(ac.Subsystem):
 
 
 class Structure(ac.Subsystem):
-    pass
 
+    def read_st_from_csv(self):
+        """Read Structural data from CSV."""
+        script_dir = os.path.dirname(__file__)
+        relative_path = os.path.join('data', 'Structure.csv')
+        st_info_path = os.path.join(script_dir, relative_path)
+        return pd.read_csv(st_info_path)
+
+    @Attribute
+    def form_factor(self):
+        "Calculate form factor for cubesat"
+        obc_selection_list=self.obc_selection
+        adcs_selection_list=self.adcs_selection
+        bat_selection_list=self.bat_selection
+        comm_selection_list=self.comm_selection
+        total_height=obc_selection_list['Height'] + adcs_selection_list['Height'] + self.instrument_height + bat_selection_list['Height'] + comm_selection_list['Height']
+        height_factor = total_height / 100
+        
+        if height_factor < 1:
+            form_factor = 1
+        elif height_factor < 1.5:
+            form_factor = 1.5
+        elif height_factor < 2:
+            form_factor = 2
+        elif height_factor < 3:
+            form_factor = 3
+        else:
+            form_factor = "No available Cubesat sizes found"
+        return form_factor
+
+    @Attribute
+    def structure(self):
+        form_factor_req = self.form_factor
+
+        struct = self.read_st_from_csv()
+        struct_selection = []
+
+        for index, row in struct.iterrows():
+            # Compare the data rate value from the CSV with the user-provided data rate
+            if row['Form_Factor'] == form_factor_req:
+                
+                # Add the row to the list of selected options as a dictionary
+                struct_selection.append({
+                    'index': index,
+                    'Form_Factor': row['Form_Factor'],
+                    'Mass': row['Mass'],
+                    'Cost': row['Cost']
+                })
+
+        if len(struct_selection) == 0:
+            # Check if any of the components match the requirement and display error 
+            raise ValueError("No suitable component found for OBC Subsystem")
+
+        return struct_selection     
 
 class Thermal(ac.Subsystem):
     pass
