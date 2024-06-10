@@ -137,8 +137,10 @@ class CubeSat(GeomBase):
         T = self.orbit.period
         # simulation timestep
         dt = constants.PaseosConfig.simulation_timestep # s
-        # number of orbits to simulate = 1 day / orbital period = Number of orbits in a day
-        orbits_to_simulate = np.ceil(pk.DAY2SEC / T)
+        # days to simulate
+        days_to_simulate = constants.PaseosConfig.days_to_simulate # days
+        # number of orbits to simulate = 1 day / orbital period * days to simulate = Number of orbits to simulate
+        orbits_to_simulate = np.ceil(pk.DAY2SEC / T) * days_to_simulate  # orbits
         # number of runs = number of seconds in a day / simulation timestep
         runs = int(pk.DAY2SEC / dt)
         # print(f"runs: {runs}")
@@ -150,6 +152,7 @@ class CubeSat(GeomBase):
             "simulation_start": t0,
             "simulation_duration": pk.DAY2SEC,
             "orbits_to_simulate": orbits_to_simulate,
+            "days_to_simulate": days_to_simulate,
             "runs": runs,
             "dt": dt,
             "altitude": self.orbit.altitude,
@@ -197,14 +200,15 @@ class CubeSat(GeomBase):
             "simulation_start": t0,
             "simulation_end": sat_actor.local_time,
             "simulation_duration": round((sat_actor.local_time.mjd2000 - t0.mjd2000)*pk.DAY2SEC,1),
-            "eclipse_time": eclipse_time,
-            "comm_window_per_day": total_comm_window,
+            "eclipse_time_per_day": eclipse_time / days_to_simulate,
+            "eclipse_time_per_orbit": eclipse_time / orbits_to_simulate,
+            "comm_window_per_day": total_comm_window / days_to_simulate,
             "comm_window_per_orbit": total_comm_window / orbits_to_simulate,
             "comm_window_fraction": total_comm_window / (orbits_to_simulate * T),
             "shortest_comm_window": min(comm_windows),
             "average_comm_window": total_comm_window / len(comm_windows),
             "longest_comm_window": max(comm_windows),
-            "number_of_contacts_per_day": len(comm_windows)
+            "number_of_contacts_per_day": len(comm_windows) / days_to_simulate,
         }
 
         if verbose:
@@ -237,7 +241,7 @@ class CubeSat(GeomBase):
             )
             # print number of contacts
             print(
-                f" number of contacts: {len(comm_windows)} ----------\n"
+                f" number of contacts: {simulation_results['number_of_contacts_per_day']} ----------\n"
                 "-----------------------------------------------------"
             )
         

@@ -1,6 +1,9 @@
 from parapy.core import *
 from parapy.geom import *
 from parapy.core.validate import OneOf, LessThan, GreaterThan, GreaterThanOrEqualTo, IsInstance
+from parapy.core.widgets import (
+    Button, CheckBox, ColorPicker, Dropdown, FilePicker, MultiCheckBox,
+    ObjectPicker, SingleSelection, TextField)
 from cubesat_configurator import subsystem as ac
 import pandas as pd
 import os
@@ -138,7 +141,7 @@ class COMM(ac.Subsystem):
 
         for index, row in comm.iterrows():
             # Compare the data rate value from the CSV with the user-provided data rate
-            if row['Data_Rate'] > self.payload.instrument_data_rate: 
+            if row['Data_Rate'] > self.parent.required_downlink_data_rate: 
                 # Score calculation
                 score = (
                     row['Mass'] * self.parent.mass_factor *0.001+
@@ -213,7 +216,9 @@ class OBC(ac.Subsystem):
         return obc_selection
 
 class EPS(ac.Subsystem):
-    Solar_panel_type = Input(validator=IsInstance(['Body-mounted', 'Deployable']), default='Body-mounted')
+    # Solar_panel_type = Input(validator=IsInstance(['Body-mounted', 'Deployable']), default='Body-mounted')
+    Solar_panel_type = Input(default='Body-mounted', widget=Dropdown(['Body-mounted', 'Deployable']))
+        
 
     def read_sp_from_csv(self):
         """Read Solar Panels data from CSV."""
@@ -234,7 +239,7 @@ class EPS(ac.Subsystem):
         comm_selection_list=self.comm_selection
         avg_power_comm=0
         for row in comm_selection_list:
-            power_comm=row['Power_DL']*(tgs/24)+row['Power_Nom']*(1-(tgs/24))
+            power_comm=row['Power_DL']*(tgs/24)+row['Power_Nom']*(1-(tgs/24)) # tgs = communication time per day 
             avg_power_comm+=power_comm
         return(avg_power_comm)
     

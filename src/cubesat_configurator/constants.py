@@ -13,6 +13,10 @@ class PaseosConfig:
     simulation_plots_location = os.path.join(script_dir, relative_plots_path)
 
 
-
 class SystemConfig:
     system_margin = 0.2
+
+
+class GenericConfig:
+    relative_step_file_path = os.path.join(script_dir, 'step_files', 'step_file.step')
+    step_file_location = os.path.join(script_dir, relative_step_file_path)
