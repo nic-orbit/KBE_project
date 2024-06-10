@@ -11,7 +11,7 @@ import pykep as pk
 
 
 class Payload(ac.Subsystem):
-    ##### MOVE EVERYTHING TO INSTRUMENT CLASS #####
+    
     #instrument requirements
     instrument_min_operating_temp = Input() # deg C
     instrument_max_operating_temp = Input() # deg C
@@ -36,7 +36,7 @@ class Payload(ac.Subsystem):
     instrument_bit_depth=Input() #range to be defined (1-24) Check gs for inputvalidator
     
     height = Input(instrument_height)
-
+    cost=Input(instrument_cost) 
     # Thought it would be nice to check if the sensor fits within the limits of the satellite
     # I saw in extreme cases (15 µm & 4k resolution) it can be almost 60 mm long on the long side. 
 
