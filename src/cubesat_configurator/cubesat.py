@@ -501,6 +501,13 @@ class CubeSat(GeomBase):
         return simulation_results
     
     @Attribute
+    def required_onboard_data_storage(self):
+        """
+        Calculate the required onboard data storage based on the maximum onboard data and the margin.
+        """
+        return self.simulate_second_orbit["maximum_onboard_data"]*(1 + constants.SystemConfig.system_margin)
+    
+    @Attribute
     def plot_simulation_data(self):
         """
         Plot the simulation data for the first orbit.
@@ -587,8 +594,11 @@ class CubeSat(GeomBase):
                               instrument_focal_length=40, # mm
                               instrument_pixel_size=7,  # µm - Typical values for industrial cameras range from 1.5 to 15 µm ( bigger --> better SNR, but larger (worse) GSD )
                               instrument_power_consumption=10, # W
+                              power = 10, # W
                               instrument_mass=0.5, # kg
+                              mass = 0.5, # kg
                               instrument_height=50, # mm
+                              height=50, # mm
                               instrument_width=100, # mm
                               instrument_length=100, # mm
                               instrument_cost=10000, # USD
@@ -615,7 +625,7 @@ class CubeSat(GeomBase):
         """
         Returns an instance of the OBC class.
         """
-        return subsys.OBC(required_onboard_data_storage=self.simulate_second_orbit["maximum_onboard_data"]*1.25E-7) # kbits to GB (GigaBytes)
+        return subsys.OBC(required_onboard_data_storage=self.required_onboard_data_storage*1.25E-7) # kbits to GB (GigaBytes)
     
     @Part
     def adcs(self):

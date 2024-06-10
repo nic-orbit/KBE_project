@@ -1,6 +1,8 @@
 from parapy.core import *
 from parapy.geom import *
 from parapy.core.validate import OneOf, LessThan, GreaterThan, GreaterThanOrEqualTo
+import os
+import pandas as pd
 
 class Subsystem(GeomBase):
     height = Input(10)
@@ -11,6 +13,13 @@ class Subsystem(GeomBase):
     # we force width and length to be always equal to 100 mm to adhere to CubeSat form factor!
     width = 100
     length = 100
+
+    def read_subsystems_from_csv(self, subsystem_file_name):
+        """Read subsystem data from CSV."""
+        script_dir = os.path.dirname(__file__)
+        relative_path = os.path.join('data', subsystem_file_name)
+        obc_info_path = os.path.join(script_dir, relative_path)
+        return pd.read_csv(obc_info_path)
 
     @Attribute
     def score_calculation(self):

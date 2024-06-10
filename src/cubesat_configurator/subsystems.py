@@ -172,17 +172,35 @@ class COMM(ac.Subsystem):
 class OBC(ac.Subsystem):
     required_onboard_data_storage = Input()  # Value needs to come from PASEOS simulation (GB)
 
+    @required_onboard_data_storage.validator
+    def required_onboard_data_storage_validator(self, value):
+        if value < 0:
+            msg = "Onboard data storage cannot be negative"
+            return False, msg
+        
+        comms_df = self.read_obc_from_csv()
+        # find maximum data storage value from the CSV
+        max_storage = comms_df['Storage'].max()
+        if value > max_storage:
+            msg = f"Required onboard data storage cannot exceed {max_storage} GB, because it is the maximum value in the database."
+            return False, msg
+        
+        return True
+    
     def read_obc_from_csv(self):
-        """Read OBC subsystem data from CSV."""
-        script_dir = os.path.dirname(__file__)
-        relative_path = os.path.join('data', 'OBC.csv')
-        obc_info_path = os.path.join(script_dir, relative_path)
-        return pd.read_csv(obc_info_path)
+        return self.read_subsystems_from_csv('OBC.csv')
+
+    # def read_obc_from_csv(self):
+    #     """Read OBC subsystem data from CSV."""
+    #     script_dir = os.path.dirname(__file__)
+    #     relative_path = os.path.join('data', 'OBC.csv')
+    #     obc_info_path = os.path.join(script_dir, relative_path)
+    #     return pd.read_csv(obc_info_path)
     
     @Attribute
     def obc_selection(self):
         """Select OBC subsystem based on payload requirements."""
-        obc = self.read_OBC_from_csv()
+        obc = self.read_obc_from_csv()
         obc_list = []
 
         for index, row in obc.iterrows():
@@ -198,7 +216,7 @@ class OBC(ac.Subsystem):
                 obc_list.append({
                     'index': index,
                     'Company': row['Company'],
-                    'Data_Rate': row['Data_Rate'],
+                    'Storage': row['Storage'],
                     'Power': row['Power'],
                     'Mass': row['Mass'],
                     'Height': row['Height'],
