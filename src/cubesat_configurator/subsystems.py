@@ -79,7 +79,8 @@ class Payload(ac.Subsystem):
         """
         instrument_data_per_day = self.image_size*self.instrument_images_per_day # kbits
         return ( instrument_data_per_day ) / ( pk.DAY2SEC ) # kbps
-#Done for now
+    
+#All good 
 class ADCS(ac.Subsystem):
     required_pointing_accuracy = Input()  # deg
 
@@ -110,53 +111,44 @@ class ADCS(ac.Subsystem):
         selected = self.component_selection(adcs, self.requirement_key,  self.required_pointing_accuracy, 'less')
 
         return selected
-    
+
+#All good    
 class COMM(ac.Subsystem):
-    # required_downlink_data_rate = Input()  # kbps
+    requirement_key = 'Data_Rate'
+    required_downlink_data_rate = Input()  # Value needs to come from PASEOS simulation (GB)
+
+    @required_downlink_data_rate.validator
+    def required_downlink_data_rate_validator(self, value):
+        if value < 0:
+            msg = "Onboard data rate cannot be negative"
+            return False, msg
+        
+        comms_df = self.read_comm_from_csv
+        # find maximum data rate value from the CSV
+        max_data_rate = comms_df['Data_Rate'].max()
+        if value > max_data_rate:
+            msg = f"Required onboard data storage cannot exceed {max_data_rate} kbps, because it is the maximum value in the database."
+            return False, msg
+        return True
+    
+    @Attribute
     def read_comm_from_csv(self):
         return self.read_subsystems_from_csv('Communication_subsystem.csv')
     
     @Attribute
     def comm_selection(self):
-        """Select communication subsystem based on payload requirements."""
-        comm = self.read_comm_from_csv()
-        comm_list = []
+        """Select Communication subsystem based on downlink data rate requirements."""
+        comm = self.read_comm_from_csv
+        tgs = self.parent.simulate_first_orbit["comm_window_per_day"]
+        selected = self.component_selection(comm, self.requirement_key,  self.required_downlink_data_rate, 'greater', is_comm=True, tgs=tgs)
 
-        for index, row in comm.iterrows():
-            # Compare the data rate value from the CSV with the user-provided data rate
-            if row['Data_Rate'] > self.parent.required_downlink_data_rate: 
-                # Score calculation
-                score = (
-                    row['Mass'] * self.parent.mass_factor *0.001+
-                    row['Cost'] * self.parent.cost_factor +
-                    row['Power'] * self.parent.power_factor
-                )
-                # Add the row to the list of selected options as a dictionary
-                comm_list.append({
-                    'index': index,
-                    'Company': row['Company'],
-                    'Data_Rate': row['Data_Rate'],
-                    'Power': row['Power'],
-                    'Mass': row['Mass'],
-                    'Height': row['Height'],
-                    'Cost': row['Cost'],
-                    'Score': score
-                })
-
-        if len(comm_list) == 0:
-            # Check if any of the components match the requirement and display error 
-            raise ValueError("No suitable component found for Communication Subsystem")
-
-        # Choose the component with the smallest score
-        comm_selection = min(comm_list, key=lambda x: x['Score'])
-
-        return comm_selection
+        return selected
     
 
-#Done for now
+#All good 
 class OBC(ac.Subsystem):
     required_onboard_data_storage = Input()  # Value needs to come from PASEOS simulation (GB)
-
+    requirement_key='Storage'
     @required_onboard_data_storage.validator
     def required_onboard_data_storage_validator(self, value):
         if value < 0:
@@ -178,13 +170,16 @@ class OBC(ac.Subsystem):
     def obc_selection(self):
         """Select OBC subsystem based on payload requirements."""
         obc = self.read_obc_from_csv()
-        return self.component_selection(self,obc, 'Storage', self.required_onboard_data_storage)
+        return self.component_selection(obc, self.requirement_key,  self.required_onboard_data_storage, 'greater')
     
 
 class EPS(ac.Subsystem):
-    # Solar_panel_type = Input(validator=IsInstance(['Body-mounted', 'Deployable']), default='Body-mounted')
-    Solar_panel_type = Input(default='Body-mounted', widget=Dropdown(['Body-mounted', 'Deployable']))
-        
+    
+    Solar_panel_type = Input(default='Body_mounted', widget=Dropdown(['Body_mounted', 'Deployable']))
+    requirement_key = 'Power'
+    time_period = Input()
+    eclipse_time = Input()
+  
 
     def read_SolarPanel_from_csv(self):
         return self.read_subsystems_from_csv('Solar_Panel.csv')
@@ -194,95 +189,40 @@ class EPS(ac.Subsystem):
     
     @Attribute
     def avg_power_comm(self):
-        comm_selection_list=self.comm_selection
-        tgs=self.parent.simulate_first_orbit["comm_window_per_day"] #input from Paseos
-        avg_power_comm=0
-        for row in comm_selection_list:
-            power_comm=row['Power_DL']*(tgs/24)+row['Power_Nom']*(1-(tgs/24)) # tgs = communication time per day 
-            avg_power_comm+=power_comm
-        return(avg_power_comm)
+        comm_selection = self.parent.communication.comm_selection
+        tgs = self.parent.simulate_first_orbit["comm_window_per_day"]  # input from Paseos
+        avg_power_comm = 0
+        power_comm = comm_selection['Power_DL'] * (tgs / (24*3600)) + comm_selection['Power_Nom'] * (1 - (tgs / (24*3600)))  # tgs = communication time per day
+        avg_power_comm += power_comm
+        return avg_power_comm
+
     
     @Attribute
     def total_power_required(self):
-        obc_selection_list=self.obc_selection
-        adcs_selection_list=self.adcs_selection
-        total_power=(self.avg_power_comm + obc_selection_list['Power'] + adcs_selection_list['Power'] + self.parent.payload.instrument_power_consumption)*(1+constants.SystemConfig.system_margin)
-        return (total_power)
+        obc_selection_list = self.parent.obc.obc_selection
+        adcs_selection_list = self.parent.adcs.adcs_selection
+        total_power = (self.avg_power_comm + obc_selection_list['Power'] + adcs_selection_list['Power'] + self.parent.payload.instrument_power_consumption) * (1 + constants.SystemConfig.system_margin)
+        return total_power
 
     
     @Attribute
     def solar_panel_selection(self):
-        """Select Solar Panels based on payload requirements."""
-        sp = self.read_sp_from_csv()
-        time_period=ac.Input()
-        eclipse_time=ac.Input()
-        solar_panel_power_req=self.total_power_required*(time_period)/(1-eclipse_time)
-        sp_list = []
-        for index, row in sp.iterrows():
-            # Compare the data rate value from the CSV with the user-provided data rate
-            if row['Power'] > solar_panel_power_req and row['Type'] == self.Solar_panel_type:
-                # Score calculation
-                score = (
-                    int(row['Mass']) * self.parent.mass_factor* 0.001 +
-                    int(row['Cost']) * self.parent.cost_factor +
-                    int(row['Power']) * self.parent.power_factor
-                )
-                # Add the row to the list of selected options
-                sp_list.append({
-                    'index': index,
-                    'Form_factor': row['Form_factor'],
-                    'Type': row['Type'],
-                    'Power': row['Power'],
-                    'Mass': row['Mass'],
-                    'Cost': row['Cost'],
-                    'Score': score
-                })
-
-        if len(sp_list) == 0:
-            # Check if any of the components match the requirement and display error 
-            raise ValueError("No suitable component found for Solar Panels")
-
-        # Choose the component with the smallest score
-        sp_selection = min(sp_list, key=lambda x: x['Score'])
-
-        return sp_selection
+        """Select Solar Panels based on power requirements."""
+        sp = self.read_SolarPanel_from_csv()
+        T = self.time_period  
+        solar_panel_power_req = self.total_power_required * (T / (1 - self.eclipse_time))
+        filtered_sp = sp[sp['Type'] == self.Solar_panel_type]
+        # return filtered_sp
+        return self.component_selection(filtered_sp, self.requirement_key, solar_panel_power_req, 'greater')
+    
 
     @Attribute
     def battery_selection(self):
-        """Select Solar Panels based on payload requirements."""
+        """Select Batteries based on power requirements."""
         bat = self.read_bat_from_csv()
-        time_period=ac.Input()
-        eclipse_time=ac.Input()
-        battery_power_req=self.total_power_required*(time_period)/(eclipse_time)
-        bat_list = []
-        for index, row in bat.iterrows():
-            # Compare the data rate value from the CSV with the user-provided data rate
-            if row['Power'] > battery_power_req:
-                # Score calculation
-                score = (
-                    int(row['Mass']) * self.parent.mass_factor* 0.001 +
-                    int(row['Cost']) * self.parent.cost_factor +
-                    int(row['Power']) * self.parent.power_factor
-                )
-                # Add the row to the list of selected options
-                bat_list.append({
-                    'index': index,
-                    'Company': row['Company'],
-                    'Power': row['Power'],
-                    'Mass': row['Mass'],
-                    'Cost': row['Cost'],
-                    'Height':row['Height'],
-                    'Score': score
-                })
-
-        if len(bat_list) == 0:
-            # Check if any of the components match the requirement and display error 
-            raise ValueError("No suitable component found for Batteries")
-
-        # Choose the component with the smallest score
-        bat_selection = min(bat_list, key=lambda x: x['Score'])
-
-        return bat_selection
+        T = self.time_period  
+        battery_power_req = self.total_power_required * (T / self.eclipse_time)
+        return self.component_selection(bat, self.requirement_key, battery_power_req, 'greater')
 
 
 class Structure(ac.Subsystem):
@@ -293,11 +233,12 @@ class Structure(ac.Subsystem):
     @Attribute
     def form_factor(self):
         "Calculate form factor for cubesat"
-        obc_selection_list=self.obc_selection
-        adcs_selection_list=self.adcs_selection
-        bat_selection_list=self.bat_selection
-        comm_selection_list=self.comm_selection
-        total_height=obc_selection_list['Height'] + adcs_selection_list['Height'] + self.instrument_height + bat_selection_list['Height'] + comm_selection_list['Height']
+        form_factor_eps=self.parent.power.solar_panel_selection['Form_factor']
+        obc_selection_list=self.parent.obc.obc_selection
+        adcs_selection_list=self.parent.adcs.adcs_selection
+        bat_selection_list=self.parent.power.battery_selection
+        comm_selection_list=self.parent.communication.comm_selection
+        total_height=obc_selection_list['Height'] + adcs_selection_list['Height'] + self.parent.payload.instrument_height + bat_selection_list['Height'] + comm_selection_list['Height']
         height_factor = total_height / 100
         
         if height_factor < 1:
@@ -310,7 +251,9 @@ class Structure(ac.Subsystem):
             form_factor = 3
         else:
             form_factor = "No available Cubesat sizes found"
-        return form_factor
+        
+        req_form_factor=max(form_factor_eps,form_factor)
+        return req_form_factor
 
     @Attribute
     def structure(self):
@@ -330,10 +273,6 @@ class Structure(ac.Subsystem):
                     'Mass': row['Mass'],
                     'Cost': row['Cost']
                 })
-
-        if len(struct_selection) == 0:
-            # Check if any of the components match the requirement and display error 
-            raise ValueError("No suitable component found for OBC Subsystem")
 
         return struct_selection     
 

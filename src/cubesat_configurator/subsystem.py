@@ -21,27 +21,41 @@ class Subsystem(GeomBase):
         obc_info_path = os.path.join(script_dir, relative_path)
         return pd.read_csv(obc_info_path)
 
-    def component_selection(self,component, filter_key, filter_value, comparator='greater'):
+    def component_selection(self,component, filter_key, filter_value, comparator='greater',is_comm=False, tgs=None):
         """Filter components and select the best component based on the score."""
         filtered_list = []
 
         # calculate mean and standard deviation of Mass Cost and Power
         mass_mean = component['Mass'].mean()
         mass_std = component['Mass'].std()
-        power_mean = component['Power'].mean()
-        power_std = component['Power'].std()
         cost_mean = component['Cost'].mean()
         cost_std = component['Cost'].std()
-        
+
+        # For communication subsystem, calculate a combined power value
+        if is_comm and tgs is not None:
+            power_combined = component['Power_DL'] * (tgs / 24) + component['Power_Nom'] * (1 - (tgs / 24))
+            power_mean = power_combined.mean()
+            power_std = power_combined.std()
+        else:
+            power_mean = component['Power'].mean()
+            power_std = component['Power'].std()
+         
         for index, row in component.iterrows():
             if comparator == 'greater':
                 FILTER_CONDITION = row[filter_key] > filter_value
             else:
                 FILTER_CONDITION = row[filter_key] < filter_value
+
             if FILTER_CONDITION:
                 norm_mass = ( row['Mass'] - mass_mean ) / mass_std
-                norm_power = ( row['Power'] - power_mean) / power_std
+                # norm_power = ( row['Power'] - power_mean) / power_std
                 norm_cost = ( row['Cost'] - cost_mean) / cost_std
+
+                if is_comm and tgs is not None:
+                    norm_power = (row['Power_DL'] * (tgs / 24) + row['Power_Nom'] * (1 - (tgs / 24)) - power_mean) / power_std
+                else:
+                    norm_power = (row['Power'] - power_mean) / power_std
+                    
                 score = (
                     norm_mass * self.parent.mass_factor +
                     norm_cost * self.parent.cost_factor +
@@ -55,7 +69,9 @@ class Subsystem(GeomBase):
                     'Storage': row.get('Storage', None),
                     'Form_factor': row.get('Form_factor', None),
                     'Type': row.get('Type', None),
-                    'Power': row['Power'],
+                    'Power': row.get('Power',None),
+                    'Power_DL': row.get('Power_DL', None),
+                    'Power_Nom': row.get('Power_Nom', None),
                     'Mass': row['Mass'],
                     'Height': row.get('Height'),
                     'Cost': row['Cost'],
