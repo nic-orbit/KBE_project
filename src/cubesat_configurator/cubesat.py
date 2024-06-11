@@ -613,7 +613,7 @@ class CubeSat(GeomBase):
         """
         Returns an instance of the COMM class.
         """
-        return subsys.COMM()
+        return subsys.COMM(required_downlink_data_rate=self.min_downlink_data_rate)
     
     @Part
     def power(self):

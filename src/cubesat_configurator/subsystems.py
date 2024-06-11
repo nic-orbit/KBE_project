@@ -108,53 +108,43 @@ class ADCS(ac.Subsystem):
         selected = self.component_selection(adcs, self.requirement_key,  self.required_pointing_accuracy, 'less')
 
         return selected
-    
+
+#Done for now    
 class COMM(ac.Subsystem):
-    # required_downlink_data_rate = Input()  # kbps
+    requirement_key = 'Data_Rate'
+    required_downlink_data_rate = Input()  # Value needs to come from PASEOS simulation (GB)
+
+    @required_downlink_data_rate.validator
+    def required_downlink_data_rate_validator(self, value):
+        if value < 0:
+            msg = "Onboard data rate cannot be negative"
+            return False, msg
+        
+        comms_df = self.read_comm_from_csv
+        # find maximum data rate value from the CSV
+        max_data_rate = comms_df['Data_Rate'].max()
+        if value > max_data_rate:
+            msg = f"Required onboard data storage cannot exceed {max_data_rate} kbps, because it is the maximum value in the database."
+            return False, msg
+        return True
+    
+    @Attribute
     def read_comm_from_csv(self):
         return self.read_subsystems_from_csv('Communication_subsystem.csv')
     
     @Attribute
     def comm_selection(self):
-        """Select communication subsystem based on payload requirements."""
-        comm = self.read_comm_from_csv()
-        comm_list = []
+        """Select Communication subsystem based on downlink data rate requirements."""
+        comm = self.read_comm_from_csv
+        selected = self.component_selection(comm, self.requirement_key,  self.required_downlink_data_rate, 'greater')
 
-        for index, row in comm.iterrows():
-            # Compare the data rate value from the CSV with the user-provided data rate
-            if row['Data_Rate'] > self.parent.required_downlink_data_rate: 
-                # Score calculation
-                score = (
-                    row['Mass'] * self.parent.mass_factor *0.001+
-                    row['Cost'] * self.parent.cost_factor +
-                    row['Power'] * self.parent.power_factor
-                )
-                # Add the row to the list of selected options as a dictionary
-                comm_list.append({
-                    'index': index,
-                    'Company': row['Company'],
-                    'Data_Rate': row['Data_Rate'],
-                    'Power': row['Power'],
-                    'Mass': row['Mass'],
-                    'Height': row['Height'],
-                    'Cost': row['Cost'],
-                    'Score': score
-                })
-
-        if len(comm_list) == 0:
-            # Check if any of the components match the requirement and display error 
-            raise ValueError("No suitable component found for Communication Subsystem")
-
-        # Choose the component with the smallest score
-        comm_selection = min(comm_list, key=lambda x: x['Score'])
-
-        return comm_selection
+        return selected
     
 
 #Done for now
 class OBC(ac.Subsystem):
     required_onboard_data_storage = Input()  # Value needs to come from PASEOS simulation (GB)
-
+    requirement_key='Storage'
     @required_onboard_data_storage.validator
     def required_onboard_data_storage_validator(self, value):
         if value < 0:
@@ -176,11 +166,11 @@ class OBC(ac.Subsystem):
     def obc_selection(self):
         """Select OBC subsystem based on payload requirements."""
         obc = self.read_obc_from_csv()
-        return self.component_selection(self,obc, 'Storage', self.required_onboard_data_storage)
+        return self.component_selection(obc, self.requirement_key,  self.required_onboard_data_storage, 'greater')
     
 
 class EPS(ac.Subsystem):
-    # Solar_panel_type = Input(validator=IsInstance(['Body-mounted', 'Deployable']), default='Body-mounted')
+    
     Solar_panel_type = Input(default='Body-mounted', widget=Dropdown(['Body-mounted', 'Deployable']))
         
 
