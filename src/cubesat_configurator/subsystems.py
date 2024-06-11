@@ -177,9 +177,7 @@ class EPS(ac.Subsystem):
     requirement_key = 'Power'
     time_period = Input()
     eclipse_time = Input()
-
-    def eclipse_time_per_orbit(self):
-        return (self.eclipse_time * self.time_period / (24 * 3600))  # Remove () after inputs
+  
 
     def read_SolarPanel_from_csv(self):
         return self.read_subsystems_from_csv('Solar_Panel.csv')
@@ -209,8 +207,8 @@ class EPS(ac.Subsystem):
     def solar_panel_selection(self):
         """Select Solar Panels based on power requirements."""
         sp = self.read_SolarPanel_from_csv()
-        T = self.time_period  # Corrected
-        solar_panel_power_req = self.total_power_required * (T / (1 - self.eclipse_time_per_orbit()))
+        T = self.time_period  
+        solar_panel_power_req = self.total_power_required * (T / (1 - self.eclipse_time))
         filtered_sp = sp[sp['Type'] == self.Solar_panel_type]
         # return filtered_sp
         return self.component_selection(filtered_sp, self.requirement_key, solar_panel_power_req, 'greater')
@@ -220,8 +218,8 @@ class EPS(ac.Subsystem):
     def battery_selection(self):
         """Select Batteries based on power requirements."""
         bat = self.read_bat_from_csv()
-        T = self.time_period  # Corrected
-        battery_power_req = self.total_power_required * (T / self.eclipse_time_per_orbit())
+        T = self.time_period  
+        battery_power_req = self.total_power_required * (T / self.eclipse_time)
         return self.component_selection(bat, self.requirement_key, battery_power_req, 'greater')
 
 
