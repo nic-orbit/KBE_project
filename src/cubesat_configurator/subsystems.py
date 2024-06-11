@@ -77,7 +77,8 @@ class Payload(ac.Subsystem):
         """
         instrument_data_per_day = self.image_size*self.instrument_images_per_day # kbits
         return ( instrument_data_per_day ) / ( pk.DAY2SEC ) # kbps
-#Done for now
+    
+#All good 
 class ADCS(ac.Subsystem):
     required_pointing_accuracy = Input()  # deg
 
@@ -109,7 +110,7 @@ class ADCS(ac.Subsystem):
 
         return selected
 
-#Done for now    
+#All good    
 class COMM(ac.Subsystem):
     requirement_key = 'Data_Rate'
     required_downlink_data_rate = Input()  # Value needs to come from PASEOS simulation (GB)
@@ -142,7 +143,7 @@ class COMM(ac.Subsystem):
         return selected
     
 
-#Done for now
+#All good 
 class OBC(ac.Subsystem):
     required_onboard_data_storage = Input()  # Value needs to come from PASEOS simulation (GB)
     requirement_key='Storage'
@@ -172,10 +173,13 @@ class OBC(ac.Subsystem):
 
 class EPS(ac.Subsystem):
     
-    Solar_panel_type = Input(default='Body-mounted', widget=Dropdown(['Body-mounted', 'Deployable']))
-    requirement_key='Power'
-    time_period= Input()
-    eclipse_time= Input()
+    Solar_panel_type = Input(default='Body_mounted', widget=Dropdown(['Body_mounted', 'Deployable']))
+    requirement_key = 'Power'
+    time_period = Input()
+    eclipse_time = Input()
+
+    def eclipse_time_per_orbit(self):
+        return (self.eclipse_time * self.time_period / (24 * 3600))  # Remove () after inputs
 
     def read_SolarPanel_from_csv(self):
         return self.read_subsystems_from_csv('Solar_Panel.csv')
@@ -185,19 +189,19 @@ class EPS(ac.Subsystem):
     
     @Attribute
     def avg_power_comm(self):
-        comm_selection_list=self.parent.communication.comm_selection
-        tgs=self.parent.simulate_first_orbit["comm_window_per_day"] #input from Paseos
-        avg_power_comm=0
-        for row in comm_selection_list:
-            power_comm=row['Power_DL']*(tgs/24)+row['Power_Nom']*(1-(tgs/24)) # tgs = communication time per day 
-            avg_power_comm+=power_comm
+        comm_selection = self.parent.communication.comm_selection
+        tgs = self.parent.simulate_first_orbit["comm_window_per_day"]  # input from Paseos
+        avg_power_comm = 0
+        power_comm = comm_selection['Power_DL'] * (tgs / (24*3600)) + comm_selection['Power_Nom'] * (1 - (tgs / (24*3600)))  # tgs = communication time per day
+        avg_power_comm += power_comm
         return avg_power_comm
+
     
     @Attribute
     def total_power_required(self):
-        obc_selection_list=self.parent.obc.obc_selection
-        adcs_selection_list=self.parent.adcs.adcs_selection
-        total_power=(self.avg_power_comm + obc_selection_list['Power'] + adcs_selection_list['Power'] + self.parent.payload.instrument_power_consumption)*(1+constants.SystemConfig.system_margin)
+        obc_selection_list = self.parent.obc.obc_selection
+        adcs_selection_list = self.parent.adcs.adcs_selection
+        total_power = (self.avg_power_comm + obc_selection_list['Power'] + adcs_selection_list['Power'] + self.parent.payload.instrument_power_consumption) * (1 + constants.SystemConfig.system_margin)
         return total_power
 
     
@@ -205,16 +209,19 @@ class EPS(ac.Subsystem):
     def solar_panel_selection(self):
         """Select Solar Panels based on power requirements."""
         sp = self.read_SolarPanel_from_csv()
-        solar_panel_power_req=self.total_power_required*(self.time_period)/(1-self.eclipse_time)
+        T = self.time_period  # Corrected
+        solar_panel_power_req = self.total_power_required * (T / (1 - self.eclipse_time_per_orbit()))
         filtered_sp = sp[sp['Type'] == self.Solar_panel_type]
+        # return filtered_sp
         return self.component_selection(filtered_sp, self.requirement_key, solar_panel_power_req, 'greater')
     
 
     @Attribute
     def battery_selection(self):
-        """Select Solar Panels based on payload requirements."""
+        """Select Batteries based on power requirements."""
         bat = self.read_bat_from_csv()
-        battery_power_req=self.total_power_required*(self.time_period)/(self.eclipse_time)
+        T = self.time_period  # Corrected
+        battery_power_req = self.total_power_required * (T / self.eclipse_time_per_orbit())
         return self.component_selection(bat, self.requirement_key, battery_power_req, 'greater')
 
 
@@ -226,11 +233,12 @@ class Structure(ac.Subsystem):
     @Attribute
     def form_factor(self):
         "Calculate form factor for cubesat"
-        obc_selection_list=self.obc_selection
-        adcs_selection_list=self.adcs_selection
-        bat_selection_list=self.bat_selection
-        comm_selection_list=self.comm_selection
-        total_height=obc_selection_list['Height'] + adcs_selection_list['Height'] + self.instrument_height + bat_selection_list['Height'] + comm_selection_list['Height']
+        form_factor_eps=self.parent.power.solar_panel_selection['Form_factor']
+        obc_selection_list=self.parent.obc.obc_selection
+        adcs_selection_list=self.parent.adcs.adcs_selection
+        bat_selection_list=self.parent.power.battery_selection
+        comm_selection_list=self.parent.communication.comm_selection
+        total_height=obc_selection_list['Height'] + adcs_selection_list['Height'] + self.parent.payload.instrument_height + bat_selection_list['Height'] + comm_selection_list['Height']
         height_factor = total_height / 100
         
         if height_factor < 1:
@@ -243,7 +251,9 @@ class Structure(ac.Subsystem):
             form_factor = 3
         else:
             form_factor = "No available Cubesat sizes found"
-        return form_factor
+        
+        req_form_factor=max(form_factor_eps,form_factor)
+        return req_form_factor
 
     @Attribute
     def structure(self):
@@ -263,10 +273,6 @@ class Structure(ac.Subsystem):
                     'Mass': row['Mass'],
                     'Cost': row['Cost']
                 })
-
-        if len(struct_selection) == 0:
-            # Check if any of the components match the requirement and display error 
-            raise ValueError("No suitable component found for OBC Subsystem")
 
         return struct_selection     
 

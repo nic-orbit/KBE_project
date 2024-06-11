@@ -211,6 +211,7 @@ class CubeSat(GeomBase):
             "average_comm_window": total_comm_window / len(comm_windows),
             "longest_comm_window": max(comm_windows),
             "number_of_contacts_per_day": len(comm_windows) / days_to_simulate,
+            "time_period": T
         }
 
         if verbose:
@@ -620,7 +621,7 @@ class CubeSat(GeomBase):
         """
         Returns an instance of the EPS class.
         """
-        return subsys.EPS(time_period=self.T, eclipse_time=self.simulate_second_orbit["eclipse_time_per_day"])
+        return subsys.EPS(time_period=self.simulate_first_orbit["time_period"], eclipse_time=self.simulate_second_orbit["eclipse_time_per_day"])
     
     @Part
     def obc(self):

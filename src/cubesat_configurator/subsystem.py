@@ -50,11 +50,12 @@ class Subsystem(GeomBase):
                 norm_mass = ( row['Mass'] - mass_mean ) / mass_std
                 # norm_power = ( row['Power'] - power_mean) / power_std
                 norm_cost = ( row['Cost'] - cost_mean) / cost_std
-                
-            if is_comm and tgs is not None:
-                norm_power = (row['Power_DL'] * (tgs / 24) + row['Power_Nom'] * (1 - (tgs / 24)) - power_mean) / power_std
-            else:
-                norm_power = (row['Power'] - power_mean) / power_std
+
+                if is_comm and tgs is not None:
+                    norm_power = (row['Power_DL'] * (tgs / 24) + row['Power_Nom'] * (1 - (tgs / 24)) - power_mean) / power_std
+                else:
+                    norm_power = (row['Power'] - power_mean) / power_std
+                    
                 score = (
                     norm_mass * self.parent.mass_factor +
                     norm_cost * self.parent.cost_factor +
