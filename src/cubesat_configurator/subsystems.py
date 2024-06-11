@@ -136,7 +136,8 @@ class COMM(ac.Subsystem):
     def comm_selection(self):
         """Select Communication subsystem based on downlink data rate requirements."""
         comm = self.read_comm_from_csv
-        selected = self.component_selection(comm, self.requirement_key,  self.required_downlink_data_rate, 'greater')
+        tgs = self.parent.simulate_first_orbit["comm_window_per_day"]
+        selected = self.component_selection(comm, self.requirement_key,  self.required_downlink_data_rate, 'greater', is_comm=True, tgs=tgs)
 
         return selected
     
@@ -172,7 +173,9 @@ class OBC(ac.Subsystem):
 class EPS(ac.Subsystem):
     
     Solar_panel_type = Input(default='Body-mounted', widget=Dropdown(['Body-mounted', 'Deployable']))
-        
+    requirement_key='Power'
+    time_period= Input()
+    eclipse_time= Input()
 
     def read_SolarPanel_from_csv(self):
         return self.read_subsystems_from_csv('Solar_Panel.csv')
@@ -182,95 +185,37 @@ class EPS(ac.Subsystem):
     
     @Attribute
     def avg_power_comm(self):
-        comm_selection_list=self.comm_selection
+        comm_selection_list=self.parent.communication.comm_selection
         tgs=self.parent.simulate_first_orbit["comm_window_per_day"] #input from Paseos
         avg_power_comm=0
         for row in comm_selection_list:
             power_comm=row['Power_DL']*(tgs/24)+row['Power_Nom']*(1-(tgs/24)) # tgs = communication time per day 
             avg_power_comm+=power_comm
-        return(avg_power_comm)
+        return avg_power_comm
     
     @Attribute
     def total_power_required(self):
         obc_selection_list=self.parent.obc.obc_selection
-        adcs_selection_list=self.adcs_selection
+        adcs_selection_list=self.parent.adcs.adcs_selection
         total_power=(self.avg_power_comm + obc_selection_list['Power'] + adcs_selection_list['Power'] + self.parent.payload.instrument_power_consumption)*(1+constants.SystemConfig.system_margin)
-        return (total_power)
+        return total_power
 
     
     @Attribute
     def solar_panel_selection(self):
-        """Select Solar Panels based on payload requirements."""
-        sp = self.read_sp_from_csv()
-        time_period=ac.Input()
-        eclipse_time=ac.Input()
-        solar_panel_power_req=self.total_power_required*(time_period)/(1-eclipse_time)
-        sp_list = []
-        for index, row in sp.iterrows():
-            # Compare the data rate value from the CSV with the user-provided data rate
-            if row['Power'] > solar_panel_power_req and row['Type'] == self.Solar_panel_type:
-                # Score calculation
-                score = (
-                    int(row['Mass']) * self.parent.mass_factor* 0.001 +
-                    int(row['Cost']) * self.parent.cost_factor +
-                    int(row['Power']) * self.parent.power_factor
-                )
-                # Add the row to the list of selected options
-                sp_list.append({
-                    'index': index,
-                    'Form_factor': row['Form_factor'],
-                    'Type': row['Type'],
-                    'Power': row['Power'],
-                    'Mass': row['Mass'],
-                    'Cost': row['Cost'],
-                    'Score': score
-                })
-
-        if len(sp_list) == 0:
-            # Check if any of the components match the requirement and display error 
-            raise ValueError("No suitable component found for Solar Panels")
-
-        # Choose the component with the smallest score
-        sp_selection = min(sp_list, key=lambda x: x['Score'])
-
-        return sp_selection
+        """Select Solar Panels based on power requirements."""
+        sp = self.read_SolarPanel_from_csv()
+        solar_panel_power_req=self.total_power_required*(self.time_period)/(1-self.eclipse_time)
+        filtered_sp = sp[sp['Type'] == self.Solar_panel_type]
+        return self.component_selection(filtered_sp, self.requirement_key, solar_panel_power_req, 'greater')
+    
 
     @Attribute
     def battery_selection(self):
         """Select Solar Panels based on payload requirements."""
         bat = self.read_bat_from_csv()
-        time_period=ac.Input()
-        eclipse_time=ac.Input()
-        battery_power_req=self.total_power_required*(time_period)/(eclipse_time)
-        bat_list = []
-        for index, row in bat.iterrows():
-            # Compare the data rate value from the CSV with the user-provided data rate
-            if row['Power'] > battery_power_req:
-                # Score calculation
-                score = (
-                    int(row['Mass']) * self.parent.mass_factor* 0.001 +
-                    int(row['Cost']) * self.parent.cost_factor +
-                    int(row['Power']) * self.parent.power_factor
-                )
-                # Add the row to the list of selected options
-                bat_list.append({
-                    'index': index,
-                    'Company': row['Company'],
-                    'Power': row['Power'],
-                    'Mass': row['Mass'],
-                    'Cost': row['Cost'],
-                    'Height':row['Height'],
-                    'Score': score
-                })
-
-        if len(bat_list) == 0:
-            # Check if any of the components match the requirement and display error 
-            raise ValueError("No suitable component found for Batteries")
-
-        # Choose the component with the smallest score
-        bat_selection = min(bat_list, key=lambda x: x['Score'])
-
-        return bat_selection
+        battery_power_req=self.total_power_required*(self.time_period)/(self.eclipse_time)
+        return self.component_selection(bat, self.requirement_key, battery_power_req, 'greater')
 
 
 class Structure(ac.Subsystem):

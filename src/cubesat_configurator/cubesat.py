@@ -620,7 +620,7 @@ class CubeSat(GeomBase):
         """
         Returns an instance of the EPS class.
         """
-        return subsys.EPS()
+        return subsys.EPS(time_period=self.T, eclipse_time=self.simulate_second_orbit["eclipse_time_per_day"])
     
     @Part
     def obc(self):
