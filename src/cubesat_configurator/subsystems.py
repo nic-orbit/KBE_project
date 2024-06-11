@@ -202,7 +202,7 @@ class EPS(ac.Subsystem):
     
     @Attribute
     def total_power_required(self):
-        obc_selection_list=self.obc_selection
+        obc_selection_list=self.parent.obc.obc_selection
         adcs_selection_list=self.adcs_selection
         total_power=(self.avg_power_comm + obc_selection_list['Power'] + adcs_selection_list['Power'] + self.parent.payload.instrument_power_consumption)*(1+constants.SystemConfig.system_margin)
         return (total_power)
