@@ -1,0 +1,44 @@
+﻿Coating,Absorptivity,Emissivity,Type
+8 mil Quartz Mirrors,0.065,0.8,Mirror
+2 mil Silvered Teflon,0.07,0.66,Teflon
+5 mil Silvered Teflon,0.07,0.78,Teflon
+2 mil Aluminized Teflon,0.13,0.68,Teflon
+5 mil Aluminized Teflon,0.13,0.78,Teflon
+S13G-LO,0.225,0.85,Coating
+Z93,0.185,0.92,Coating
+Z0T,0.19,0.91,Coating
+Chemglaze A276,0.25,0.88,Coating
+Chemglaze Z306,0.95,0.89,Coating
+3M black Velvet,0.97,0.84,Coating
+1/2 mil Aluminized Kapton,0.34,0.55,Kapton
+1 mil Aluminized Kapton,0.38,0.67,Kapton
+2 mil Aluminized Kapton,0.41,0.75,Kapton
+5 mil Aluminized Kapton,0.46,0.86,Kapton
+Vapor Deposited Aluminum VDA,0.125,0.04,Metal
+Bare Aluminum,0.13,0.065,Metal
+Vaporized Deposited Gold,0.245,0.03,Metal
+Beta Cloth,0.32,0.8,Fabric
+Astro Quartz,0.22,0.1,Quartz
+MAXORB,0.9,0.1,Fabric
+316 Stainless Steel,0.39,0.11,Metal
+Black Anodized Aluminum,0.88,0.88,Metal
+Clear Anodized Aluminum,0.43,0.67,Metal
+Silver,0.04,0.02,Metal
+AZ-93,0.15,0.91,Coating
+Solar White,0.01,0.6,Coating
+FR-4,0.92,0.85,Composite
+MLI,0.13,0.04,Insulation
+Ultem PEI,0.38,0.9,Polymer
+Astral Technologies Unlimited StaMet/100XC Kapton,0.35,0.5,Kapton
+StaMet/275XC Kapton,0.36,0.56,Kapton
+Germanium/100XC Kapton,0.37,0.55,Kapton
+Dunmore Multek/Sheldahl VDA/200HN/PSA,0.25,0.08,Composite
+Multek/Sheldahl 200HN/VDA/PSA,0.21,0.41,Composite
+Multek/Sheldahl 100HN/VDA/PSA,0.19,0.38,Composite
+Multek/Sheldahl VDG/200HN/PSA,0.1,0.2,Composite
+NASA GSFC GSFC Silver Composite Coating/200HN Kapton,0.05,0.1,Kapton
+GSFC Aluminum Composite Coating/200HN Kapton,0.17,0.14,Kapton
+GSFC Aluminum Composite Coating/100XC Kapton,0.1,0.2,Kapton
+GSFC Aluminum Composite Coating/275XC Kapton,0.14,0.28,Kapton
+GSFC Tailorable Emittance Coating/200HN Kapton,0.12,0.15,Kapton
+Thales Optical Solar Reflector CMX 0005,0.04,0.08,Reflector

@@ -6,9 +6,11 @@ from parapy.core.widgets import (
     ObjectPicker, SingleSelection, TextField)
 from cubesat_configurator import subsystem as ac
 import pandas as pd
+import numpy as np
 import os
 import pykep as pk
 from cubesat_configurator import constants
+from cubesat_configurator import thermal_helpers as th
 
 
 class Payload(ac.Subsystem):
@@ -336,7 +338,205 @@ class Structure(ac.Subsystem):
         return struct_selection     
 
 class Thermal(ac.Subsystem):
-    pass
+    T_max_in_C = Input()  # deg C
+    T_min_in_C = Input()  # deg C
+    T_margin = Input()  # deg C (or K)
+    satellite_cp = Input(900)  # J/kgK specific heat capacity of aluminum
+    
+    @T_max_in_C.validator
+    def T_max_in_C_validator(self, value):
+        if value - self.T_margin < self.T_min_in_C + self.T_margin:
+            msg = "Maximum temperature cannot be smaller than minimum temperature, including the margin."
+            return False, msg
+        return True
+    
+    @T_min_in_C.validator
+    def T_min_in_C_validator(self, value):
+        if value + self.T_margin > self.T_max_in_C - self.T_margin:
+            msg = "Minimum temperature cannot be larger than maximum temperature, including the margin."
+            return False, msg
+        return True
+    
+    @T_margin.validator
+    def T_margin_validator(self, value):
+        if value < 0:
+            msg = "Margin cannot be negative"
+            return False, msg
+        return True
+    
+    @Attribute
+    def T_max_with_margin_in_K(self):
+        return self.T_max_in_C + 273.15 - self.T_margin # K
+    
+    @Attribute
+    def T_min_with_margin_in_K(self):
+        return self.T_min_in_C + 273.15 + self.T_margin # K
+
+    @Attribute
+    def sa_type(self):
+        return self.parent.eps.Solar_panel_type
+    
+    @Attribute
+    def form_factor(self):
+        return self.parent.structure.form_factor
+    
+    @Attribute
+    def apoapsis(self):
+        return self.parent.orbit.apoapsis
+    
+    @Attribute
+    def periapsis(self):
+        return self.parent.orbit.periapsis
+    
+    @Attribute
+    def satellite_mass(self):
+        return self.parent.mass
+    
+    @Attribute
+    def eclipse_time(self):
+        return self.parent.simulate_first_orbit["eclipse_time_per_orbit"]
+    
+    @Attribute
+    def coatings_df(self):
+        if self.sa_type == 'Body-mounted':
+            return pd.read_csv(os.path.join(os.path.dirname(__file__), 'data/thermal_coatings/coatings_NASA_solarcells.csv'))
+        elif self.sa_type == 'Deployable':
+            return pd.read_csv(os.path.join(os.path.dirname(__file__), 'data/thermal_coatings/coatings_SMAD_no_dupl.csv'))
+        else:
+            raise ValueError('Invalid solar array type. Choose "Body-mounted" or "Deployable".')
+        
+    @Attribute
+    def Q_internal(self):
+        # TODO: Get correct heat dissipation values from the components
+        ADCS_dissipation = self.parent.adcs.adcs_selection['Power']
+        COMM_dissipation = self.parent.communication.comm_selection['Power']
+        OBC_dissipation = self.parent.obc.obc_selection['Power']
+        Payload_dissipation = self.parent.payload.instrument_power_consumption
+
+        return ADCS_dissipation + COMM_dissipation + OBC_dissipation + Payload_dissipation
+    
+    @Attribute
+    def selected_coating(self):
+
+        U = np.array([1, 2, 3], dtype=float)  # form factors
+
+        # max cross sectional area for all u in U
+        A_C_max = np.sqrt(2) * U * 0.01 # m^2
+
+        # min cross sectional area for all u in U, same for all form factors
+        A_C_min = 0.01 # m^2
+
+        # surface area for all u in U
+        A_S = (2+4*U) * 0.01 # m^2
+
+        local_coatings_df = self.coatings_df.copy()
+
+        ####### loop coatings
+        for i in range(0, len(local_coatings_df)):
+            ####### loop form factors
+            for u in range(0, len(U)):
+                T_hot_eq = th.calculate_equilibrium_hot_temp(0, 
+                                                            self.Q_internal,
+                                                            local_coatings_df.loc[i, 'Absorptivity'], 
+                                                            local_coatings_df.loc[i, 'Emissivity'], 
+                                                            self.periapsis, 
+                                                            self.apoapsis, 
+                                                            A_C_max[u], 
+                                                            A_C_min, 
+                                                            A_S[u])  # K
+                T_cold_eq = th.calculate_equilibrium_cold_temp(0, 
+                                                            self.Q_internal,
+                                                            local_coatings_df.loc[i, 'Absorptivity'], 
+                                                            local_coatings_df.loc[i, 'Emissivity'], 
+                                                            self.periapsis, 
+                                                            self.apoapsis, 
+                                                            A_C_max[u], 
+                                                            A_C_min, 
+                                                            A_S[u])  # K
+
+                # final temperatures for design
+                T_hot = T_hot_eq
+                
+                T_cold = th.exact_transient_solution_cooling(T_cold_eq, 
+                                                             T_hot, 
+                                                             self.satellite_mass, 
+                                                             self.satellite_cp, 
+                                                             local_coatings_df.loc[i, 'Emissivity'], 
+                                                             A_S[u], 
+                                                             self.eclipse_time)  # K
+
+                local_coatings_df.loc[i, f'Hot Case {u+1}U'] = T_hot  # K
+                local_coatings_df.loc[i, f'Cold Case {u+1}U'] = T_cold  # K
+                local_coatings_df.loc[i, f'Hot Margin {u+1}U'] = self.T_max_with_margin_in_K - T_hot  # K
+                local_coatings_df.loc[i, f'Cold Margin {u+1}U'] = T_cold - self.T_min_with_margin_in_K  # K
+
+        # print coatings_df only the margins
+        print(local_coatings_df[['Coating' , 'Hot Margin 1U', 'Cold Margin 1U','Hot Margin 2U', 'Cold Margin 2U', 'Hot Margin 3U',  'Cold Margin 3U']])
+        
+        selected_coating = th.select_coating(self.form_factor, local_coatings_df)
+        return selected_coating
+
+    @Attribute
+    def T_hot_case(self):
+        return self.selected_coating['Hot Case']
+    
+    @Attribute
+    def T_cold_case(self):
+        if self.selected_coating[f'Cold Margin {self.form_factor}U'] >= 0:
+            return self.selected_coating['Cold Case']
+        else:
+            self.final_heater_values['Cold Case with Heater']
+
+    @Attribute
+    def final_heater_values(self):
+        # maximum cross sectional area for given form factor
+        A_C_max = np.sqrt(2) * self.form_factor * 0.01 # m^2
+        # minimum cross sectional area for all form factors
+        A_C_min = 0.01 # m^2
+        # cubesat surface area for given form factor
+        A_S = (2+4*self.form_factor) * 0.01 # m^2
+
+        T = self.selected_coating['Cold Case']
+        P = 0
+        while T < self.T_min_with_margin_in_K:
+            T_hot_eq = th.calculate_equilibrium_hot_temp(P, 
+                                                        self.Q_internal,
+                                                        self.selected_coating['Absorptivity'], 
+                                                        self.selected_coating['Emissivity'], 
+                                                        self.periapsis, 
+                                                        self.apoapsis, 
+                                                        A_C_max, 
+                                                        A_C_min, 
+                                                        A_S)  # K
+            T_cold_eq = th.calculate_equilibrium_cold_temp(P, 
+                                                        self.Q_internal,
+                                                        self.selected_coating['Absorptivity'], 
+                                                        self.selected_coating['Emissivity'], 
+                                                        self.periapsis, 
+                                                        self.apoapsis, 
+                                                        A_C_max, 
+                                                        A_C_min, 
+                                                        A_S)  # K
+            T_hot = T_hot_eq
+            # print(f"for test {T_cold_eq} < {T_hot}")
+            T = th.exact_transient_solution_cooling(T_cold_eq, 
+                                                    T_hot, 
+                                                    self.satellite_mass, 
+                                                    self.satellite_cp, 
+                                                    self.selected_coating.loc['Emissivity'], 
+                                                    A_S, 
+                                                    self.eclipse_time)  # K
+            
+            P += 0.001  # increase heater power by 1mW
+
+        final_heater_values = {
+            'Heater Power': round(P,3),
+            'Cold Case with Heater': T,
+            'Cold Margin with Heater': T - self.T_min_with_margin_in_K}
+        
+        return final_heater_values
+
+
 
 
 

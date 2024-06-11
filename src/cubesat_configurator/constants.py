@@ -11,6 +11,20 @@ class PaseosConfig:
     days_to_simulate = 2  # days
     relative_plots_path = os.path.join(script_dir, 'plots', 'simulation_plots.png')
     simulation_plots_location = os.path.join(script_dir, relative_plots_path)
+    
+
+class Thermal:
+    boltzmann_constant = 5.67e-8  # W/m^2K^4
+    earth_avg_temp = 288  # K
+    earth_radius = 6371e3  # m
+    earth_albedo = 0.3
+    e_Earth = 0.9
+    S = 1361  # W/m^2
+    
+    sa_coatings_relative_path = os.path.join('data', 'thermal_coatings', 'coatings_NASA_solarcells.csv')
+    sa_coatings_path = os.path.join(script_dir, sa_coatings_relative_path)
+    body_coatings_relative_path = os.path.join('data', 'thermal_coatings', 'coatings_SMAD_no_dupl.csv')
+    body_coatings_path = os.path.join(script_dir, body_coatings_relative_path)
 
 
 class SystemConfig:
