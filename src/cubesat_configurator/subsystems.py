@@ -109,7 +109,7 @@ class ADCS(ac.Subsystem):
         """Select ADCS subsystem based on payload requirements."""
         adcs = self.read_adcs_from_csv
         selected = self.component_selection(adcs, self.requirement_key,  self.required_pointing_accuracy, 'less')
-
+        self.height = selected['Height']
         return selected
 
 #All good    
@@ -141,7 +141,7 @@ class COMM(ac.Subsystem):
         comm = self.read_comm_from_csv
         tgs = self.parent.simulate_first_orbit["comm_window_per_day"]
         selected = self.component_selection(comm, self.requirement_key,  self.required_downlink_data_rate, 'greater', is_comm=True, tgs=tgs)
-
+        self.height=selected['Height']
         return selected
     
 
@@ -172,7 +172,7 @@ class OBC(ac.Subsystem):
         """Select OBC subsystem based on payload requirements."""
         obc = self.read_obc_from_csv()
         obc_selection = self.component_selection(obc, self.requirement_key,  self.required_onboard_data_storage, 'greater')
-        self.power = obc_selection['Power']
+        self.height = obc_selection['Height']
         return obc_selection
     
 
@@ -252,8 +252,9 @@ class EPS(ac.Subsystem):
         if req_battery_capacity > bat['Capacity'].max():
             req_battery_capacity = state_of_charge_min * self.eclipse_time * self.eclipse_power_without_COM
             print(req_battery_capacity)
-
-        return self.component_selection(bat, requirement_key, req_battery_capacity, 'greater', subsystem_name='eps')
+        selected = self.component_selection(bat, requirement_key, req_battery_capacity, 'greater', subsystem_name='eps')
+        self.height = selected['Height']
+        return selected
     
     @Attribute
     def req_solar_panel_power(self):
@@ -372,10 +373,6 @@ class Thermal(ac.Subsystem):
     @Attribute
     def T_min_with_margin_in_K(self):
         return self.T_min_in_C + 273.15 + self.T_margin # K
-
-    @Attribute
-    def sa_type(self):
-        return self.parent.power.Solar_panel_type
     
     @Attribute
     def form_factor(self):
@@ -401,12 +398,7 @@ class Thermal(ac.Subsystem):
     
     @Attribute
     def coatings_df(self):
-        if self.sa_type == 'Body_mounted':
-            return pd.read_csv(os.path.join(os.path.dirname(__file__), 'data/thermal_coatings/coatings_NASA_solarcells.csv'))
-        elif self.sa_type == 'Deployable':
             return pd.read_csv(os.path.join(os.path.dirname(__file__), 'data/thermal_coatings/coatings_SMAD_no_dupl.csv'))
-        else:
-            raise ValueError('Invalid solar array type. Choose "Body_mounted" or "Deployable".')
         
     @Attribute
     def Q_internal(self):

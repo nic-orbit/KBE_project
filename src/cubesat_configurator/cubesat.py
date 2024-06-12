@@ -42,7 +42,7 @@ class CubeSat(GeomBase):
         """
         power = 0
         for child in self.children:
-            if isinstance(child, ac.Subsystem) and hasattr(child, "power"):
+            if isinstance(child, ac.Subsystem) and hasattr(child, "power") and child.power is not None:
                 power += child.power
         return power*(1 + constants.SystemConfig.system_margin) # W
 
