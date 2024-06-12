@@ -55,7 +55,7 @@ class Subsystem(GeomBase):
                     norm_power = (row['Power_DL'] * (tgs / 24) + row['Power_Nom'] * (1 - (tgs / 24)) - power_mean) / power_std
                 else:
                     norm_power = (row['Power'] - power_mean) / power_std
-                    
+
                 score = (
                     norm_mass * self.parent.mass_factor +
                     norm_cost * self.parent.cost_factor +
@@ -75,6 +75,8 @@ class Subsystem(GeomBase):
                     'Mass': row['Mass'],
                     'Height': row.get('Height'),
                     'Cost': row['Cost'],
+                    'Min_Temp':row.get('Min_Temp', None),
+                    'Max_Temp':row.get('Max_Temp', None),
                     'Score': score
                 })
         

@@ -1,6 +1,6 @@
-index,Company,Power,Mass,Cost,Height
-1,AMUN,30,200,9300,20
-2,Solo PM4,100,350,15000,50
-3,ICEPS2,28.8,184,7300,26.5
-4,AAC,57.6,310,6700,21
-5,CrystalSpace P1U,22,130,7000,12
+index,Company,Power,Mass,Cost,Height,Min_Temp,Max_Temp
+1,AMUN,30,200,9300,20,-40,85
+2,Solo PM4,100,350,15000,50,-40,80
+3,ICEPS2,28.8,184,7300,26.5,-40,80
+4,AAC,57.6,310,6700,21,-40,85
+5,CrystalSpace P1U,22,130,7000,12,-40,85
