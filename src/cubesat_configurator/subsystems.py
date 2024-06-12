@@ -184,7 +184,8 @@ class EPS(ac.Subsystem):
 
     def read_SolarPanel_from_csv(self):
         sp=self.read_subsystems_from_csv('Solar_Panel.csv')
-        return (sp[sp['Type'] == self.Solar_cell_type])
+        selected_panel = sp[sp['Type'] == self.Solar_cell_type]
+        return (selected_panel.iloc[0])
     
     def read_bat_from_csv(self):
         return self.read_subsystems_from_csv('Battery.csv')
@@ -271,7 +272,8 @@ class EPS(ac.Subsystem):
     
     @Attribute
     def solar_panel_area(self):
-        return (self.req_solar_panel_power/self._solar_panel_fluxEOL)
+        area = self.req_solar_panel_power/self._solar_panel_fluxEOL
+        return area
     
     @Attribute
     def solar_panel_mass(self):
@@ -327,9 +329,14 @@ class Structure(ac.Subsystem):
                     'Mass': row['Mass'],
                     'Cost': row['Cost']
                 })
-        self.mass = struct_selection['Mass']
-        self.cost = struct_selection['Cost']
-        return struct_selection     
+        if len(struct_selection) == 0:
+            raise ValueError("No suitable component found based on the criteria.") 
+        
+        selected_structure = struct_selection[0]
+        self.mass = selected_structure['Mass']
+        self.cost = selected_structure['Cost']
+        
+        return selected_structure     
 
 class Thermal(ac.Subsystem):
     T_max_in_C = Input()  # deg C
