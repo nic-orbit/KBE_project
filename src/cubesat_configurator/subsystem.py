@@ -21,7 +21,7 @@ class Subsystem(GeomBase):
         obc_info_path = os.path.join(script_dir, relative_path)
         return pd.read_csv(obc_info_path)
 
-    def component_selection(self,component, filter_key, filter_value, comparator='greater',is_comm=False, tgs=None):
+    def component_selection(self,component, filter_key, filter_value, comparator='greater',is_comm=False, tgs=None, subsystem_name='eps'):
         """Filter components and select the best component based on the score."""
         filtered_list = []
 
@@ -36,6 +36,10 @@ class Subsystem(GeomBase):
             power_combined = component['Power_DL'] * (tgs / 24) + component['Power_Nom'] * (1 - (tgs / 24))
             power_mean = power_combined.mean()
             power_std = power_combined.std()
+        
+        elif subsystem_name == 'eps':
+            power_mean = 0
+            power_std = 0
         else:
             power_mean = component['Power'].mean()
             power_std = component['Power'].std()
@@ -53,14 +57,25 @@ class Subsystem(GeomBase):
 
                 if is_comm and tgs is not None:
                     norm_power = (row['Power_DL'] * (tgs / 24) + row['Power_Nom'] * (1 - (tgs / 24)) - power_mean) / power_std
+
+                elif subsystem_name == 'eps':
+                    norm_power = 0
+
                 else:
                     norm_power = (row['Power'] - power_mean) / power_std
 
-                score = (
+                if subsystem_name == 'eps':
+                    score = (
+                    norm_mass * self.parent.mass_factor +
+                    norm_cost * self.parent.cost_factor
+                )
+                else:
+                    score = (
                     norm_mass * self.parent.mass_factor +
                     norm_cost * self.parent.cost_factor +
                     norm_power * self.parent.power_factor
                 )
+                
                 filtered_list.append({
                     'index': index,
                     'Company': row.get('Company',None),
@@ -77,6 +92,7 @@ class Subsystem(GeomBase):
                     'Cost': row['Cost'],
                     'Min_Temp':row.get('Min_Temp', None),
                     'Max_Temp':row.get('Max_Temp', None),
+                    'Capacity':row.get('Capacity', None),
                     'Score': score
                 })
         
