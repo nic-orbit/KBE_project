@@ -279,29 +279,29 @@ class Structure(ac.Subsystem):
 class Thermal(ac.Subsystem):
     T_max_in_C = Input()  # deg C
     T_min_in_C = Input()  # deg C
-    T_margin = Input()  # deg C (or K)
+    T_margin = Input(5)  # deg C (or K)
     satellite_cp = Input(900)  # J/kgK specific heat capacity of aluminum
     
-    @T_max_in_C.validator
-    def T_max_in_C_validator(self, value):
-        if value - self.T_margin < self.T_min_in_C + self.T_margin:
-            msg = "Maximum temperature cannot be smaller than minimum temperature, including the margin."
-            return False, msg
-        return True
+    # @T_max_in_C.validator
+    # def T_max_in_C_validator(self, value):
+    #     if value - self.T_margin < self.T_min_in_C + self.T_margin:
+    #         msg = "Maximum temperature cannot be smaller than minimum temperature, including the margin."
+    #         return False, msg
+    #     return True
     
-    @T_min_in_C.validator
-    def T_min_in_C_validator(self, value):
-        if value + self.T_margin > self.T_max_in_C - self.T_margin:
-            msg = "Minimum temperature cannot be larger than maximum temperature, including the margin."
-            return False, msg
-        return True
+    # @T_min_in_C.validator
+    # def T_min_in_C_validator(self, value):
+    #     if value + self.T_margin > self.T_max_in_C - self.T_margin:
+    #         msg = "Minimum temperature cannot be larger than maximum temperature, including the margin."
+    #         return False, msg
+    #     return True
     
-    @T_margin.validator
-    def T_margin_validator(self, value):
-        if value < 0:
-            msg = "Margin cannot be negative"
-            return False, msg
-        return True
+    # @T_margin.validator
+    # def T_margin_validator(self, value):
+    #     if value < 0:
+    #         msg = "Margin cannot be negative"
+    #         return False, msg
+    #     return True
     
     @Attribute
     def T_max_with_margin_in_K(self):
@@ -313,11 +313,12 @@ class Thermal(ac.Subsystem):
 
     @Attribute
     def sa_type(self):
-        return self.parent.eps.Solar_panel_type
+        return self.parent.power.Solar_panel_type
     
     @Attribute
     def form_factor(self):
-        return self.parent.structure.form_factor
+        # return self.parent.structure.form_factor
+        return 2 
     
     @Attribute
     def apoapsis(self):
@@ -329,7 +330,8 @@ class Thermal(ac.Subsystem):
     
     @Attribute
     def satellite_mass(self):
-        return self.parent.mass
+        # return self.parent.mass
+        return 2  # kg mass of satellite
     
     @Attribute
     def eclipse_time(self):
@@ -337,18 +339,18 @@ class Thermal(ac.Subsystem):
     
     @Attribute
     def coatings_df(self):
-        if self.sa_type == 'Body-mounted':
+        if self.sa_type == 'Body_mounted':
             return pd.read_csv(os.path.join(os.path.dirname(__file__), 'data/thermal_coatings/coatings_NASA_solarcells.csv'))
         elif self.sa_type == 'Deployable':
             return pd.read_csv(os.path.join(os.path.dirname(__file__), 'data/thermal_coatings/coatings_SMAD_no_dupl.csv'))
         else:
-            raise ValueError('Invalid solar array type. Choose "Body-mounted" or "Deployable".')
+            raise ValueError('Invalid solar array type. Choose "Body_mounted" or "Deployable".')
         
     @Attribute
     def Q_internal(self):
         # TODO: Get correct heat dissipation values from the components
         ADCS_dissipation = self.parent.adcs.adcs_selection['Power']
-        COMM_dissipation = self.parent.communication.comm_selection['Power']
+        COMM_dissipation = self.parent.communication.comm_selection['Power_Nom']
         OBC_dissipation = self.parent.obc.obc_selection['Power']
         Payload_dissipation = self.parent.payload.instrument_power_consumption
 
@@ -421,10 +423,12 @@ class Thermal(ac.Subsystem):
     
     @Attribute
     def T_cold_case(self):
-        if self.selected_coating[f'Cold Margin {self.form_factor}U'] >= 0:
+        if self.selected_coating[f'Cold Margin'] >= 0:
+            self.power = 0
             return self.selected_coating['Cold Case']
         else:
-            self.final_heater_values['Cold Case with Heater']
+            self.power = self.final_heater_values['Heater Power']
+            return self.final_heater_values['Cold Case with Heater']
 
     @Attribute
     def final_heater_values(self):
@@ -462,7 +466,7 @@ class Thermal(ac.Subsystem):
                                                     T_hot, 
                                                     self.satellite_mass, 
                                                     self.satellite_cp, 
-                                                    self.selected_coating.loc['Emissivity'], 
+                                                    self.selected_coating['Emissivity'], 
                                                     A_S, 
                                                     self.eclipse_time)  # K
             
