@@ -22,28 +22,30 @@ class Subsystem(GeomBase):
         return pd.read_csv(obc_info_path)
 
     def component_selection(self,component, filter_key, filter_value, comparator='greater',is_comm=False, tgs=None, subsystem_name='eps'):
-        """Filter components and select the best component based on the score."""
+        """Filter components and select the best component based on the score and subsystem type"""
         filtered_list = []
 
-        # calculate mean and standard deviation of Mass Cost and Power
+        # calculate mean and standard deviation of Mass and Cost 
         mass_mean = component['Mass'].mean()
         mass_std = component['Mass'].std()
         cost_mean = component['Cost'].mean()
         cost_std = component['Cost'].std()
 
-        # For communication subsystem, calculate a combined power value
+        # For communication subsystem, calculate a combined power value, Power mean and standard deviations are calculated differently 
         if is_comm and tgs is not None:
             power_combined = component['Power_DL'] * (tgs / (24*3600)) + component['Power_Nom'] * (1 - (tgs / (24*3600)))
             power_mean = power_combined.mean()
             power_std = power_combined.std()
-        
+
+        # For Power subsystem, score is calculated without the power factor 
         elif subsystem_name == 'eps':
             power_mean = 0
             power_std = 0
         else:
             power_mean = component['Power'].mean()
             power_std = component['Power'].std()
-         
+
+        # Returns components from list that satisfy the filter value 
         for index, row in component.iterrows():
             if comparator == 'greater':
                 FILTER_CONDITION = row[filter_key] > filter_value
@@ -52,9 +54,9 @@ class Subsystem(GeomBase):
 
             if FILTER_CONDITION:
                 norm_mass = ( row['Mass'] - mass_mean ) / mass_std
-                # norm_power = ( row['Power'] - power_mean) / power_std
                 norm_cost = ( row['Cost'] - cost_mean) / cost_std
 
+                #Norm Power calculated differently for Communication subsystem
                 if is_comm and tgs is not None:
                     norm_power = (row['Power_DL'] * (tgs / (24*3600)) + row['Power_Nom'] * (1 - (tgs / (24*3600))) - power_mean) / power_std
 
@@ -63,6 +65,8 @@ class Subsystem(GeomBase):
 
                 else:
                     norm_power = (row['Power'] - power_mean) / power_std
+
+                #Score is calculated using 
 
                 if subsystem_name == 'eps':
                     score = (
