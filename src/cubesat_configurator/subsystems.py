@@ -10,6 +10,7 @@ import numpy as np
 import os
 import pykep as pk
 from cubesat_configurator import constants
+import itertools
 from cubesat_configurator import thermal_helpers as th
 
 
@@ -337,7 +338,117 @@ class Structure(ac.Subsystem):
         self.mass = selected_structure['Mass']
         self.cost = selected_structure['Cost']
         
-        return selected_structure     
+        return selected_structure
+    
+    @Attribute
+    def subsystem_data_for_stacking(self):
+        """
+        Returns a list of dictionaries with the height, mass and name of each subsystem.
+        """
+        subsystems = [self.parent.payload, self.parent.adcs, self.parent.obc, self.parent.communication, self.parent.power]
+        subsystem_data = []
+        for subsystem in subsystems:
+            subsystem_data.append({
+                'name': subsystem.__class__.__name__,
+                'height': subsystem.height,
+                'mass': subsystem.mass,
+                'CoM_Location': None,
+            })
+        return subsystem_data
+    
+    @Attribute
+    def optimal_stacking_order(self):
+        """
+        Returns the optimal stacking order of the subsystems based on the form factor of the satellite.
+        """
+        distance_btw_subsystems = 0
+        # find 'Payload' subsystem and fix it at the bottom of the stack
+        fixed_at_bottom = next(sub for sub in self.subsystem_data_for_stacking if sub['name'] == 'Payload')
+        
+        optimal_stack = self._find_optimal_stacking_order(self.subsystem_data_for_stacking, distance_btw_subsystems, fixed_at_bottom)
+        return optimal_stack
+
+    
+    def _find_optimal_stacking_order(self, subsystems, distance_btw_subsystems, fixed_at_bottom=None):
+
+        min_distance = float('inf') # Initialize minimum distance to infinity
+        optimal_stack = None
+        
+        # Generate all permutations of subsystems
+        permutations = itertools.permutations(subsystems)
+        
+        perm_list = []
+        
+        # Iterate through all permutations
+        for perm in permutations:
+            if fixed_at_bottom and perm[0]['name'] != fixed_at_bottom['name']:
+                continue  # Skip permutations that don't have the fixed subsystem at the bottom
+            
+            current_height = 0
+            # Iterate through all subsystems in the permutation
+            for sub in perm:
+                sub['CoM_Location'] = current_height + sub['height'] / 2
+                current_height += sub['height'] + distance_btw_subsystems
+
+            # sort subsystems by CoM_Location
+            # perm_sorted = sorted(perm, key=lambda x: x['CoM_Location'])
+            perm_sorted = sorted(perm, key=lambda x: x['CoM_Location'], reverse=True)
+
+            total_height = current_height - distance_btw_subsystems # remove the last distance added
+            # assert total_height == 100*self.form_factor # check if the total height is equal to the form factor
+
+            geometric_center = total_height / 2
+            CoM = self.calculate_CoM_of_stack(perm)
+            distance = abs(CoM - geometric_center)
+            
+            if distance < min_distance:
+                min_distance = distance
+                perm_list.append(perm_sorted)
+                self._display_stacking(perm_sorted, total_height)
+        
+        print("Optimal stacking order: ", perm_list[-1])
+        for perm_sorted in perm_list:
+            print("---------")
+            for sub in perm_sorted:
+                print(sub['name'], "CoM: ", sub['CoM_Location'])
+            print("---------")
+        
+        return perm_list[-1]
+
+    def calculate_CoM_of_stack(self, stack):
+
+        total_mass = sum(sub['mass'] for sub in stack)
+        weighted_sum = 0
+
+        for sub in stack:
+            sub_CoM = sub['CoM_Location'] / 2
+            weighted_sum += sub['mass'] * sub_CoM
+
+        CoM = weighted_sum / total_mass
+
+        return CoM
+    
+    
+    def _display_stacking(self, stack, total_height):
+        # print stacking order, showing the subsystem name and CoM height; the top one first
+        for sub in reversed(stack):
+            print(f"{sub['name']} (CoM height: {sub['CoM_Location']}; height: {sub['height']}; mass: {sub['mass']})")
+        
+        # print the total height of the stack 
+        print(f"\nTotal height: {total_height}")
+        # print the geometric center of the stack
+        geometric_center = total_height / 2
+        print(f"Geometric center: {geometric_center}")
+        # print the calculated CoM of the stack
+        CoM_total = self.calculate_CoM_of_stack(stack)
+        print(f"Calculated CoM of the stack: {CoM_total}")
+        # print the minimum distance between the CoM and the geometric center
+        CoM_distance = CoM_total - geometric_center
+        print(f"Minimum distance from CoM to geometric center: {CoM_distance}")
+
+    # @Attribute
+    # def CoM(self):
+    #     return Point(x=0.5*self.width, y=0.5*self.length, z=0.5*self.height)
 
 class Thermal(ac.Subsystem):
     T_max_in_C = Input()  # deg C

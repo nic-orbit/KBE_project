@@ -22,7 +22,9 @@ class Subsystem(GeomBase):
         return pd.read_csv(obc_info_path)
 
     def component_selection(self,component, filter_key, filter_value, comparator='greater',is_comm=False, tgs=None, subsystem_name='eps'):
-        """Filter components and select the best component based on the score."""
+        """
+        Filter components and select the best component based on the score.
+        """
         filtered_list = []
 
         # calculate mean and standard deviation of Mass Cost and Power
