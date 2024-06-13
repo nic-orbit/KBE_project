@@ -14,6 +14,7 @@ from paseos import ActorBuilder, SpacecraftActor, GroundstationActor, PowerDevic
 from cubesat_configurator import constants
 from cubesat_configurator.orbit import Orbit
 import matplotlib.pyplot as plt
+from cubesat_configurator.structure import Structure
 
 
 
@@ -641,7 +642,7 @@ class CubeSat(GeomBase):
         """
         Returns an instance of the Structure class.
         """
-        return subsys.Structure()
+        return Structure()
 
     @Part
     def thermal(self):

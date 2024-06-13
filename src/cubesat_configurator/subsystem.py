@@ -1,6 +1,7 @@
 from parapy.core import *
 from parapy.geom import *
 from parapy.core.validate import OneOf, LessThan, GreaterThan, GreaterThanOrEqualTo
+from parapy.core.widgets import ColorPicker, CheckBox, FilePicker, Dropdown
 import os
 import pandas as pd
 
@@ -9,6 +10,8 @@ class Subsystem(GeomBase):
     mass = Input(0.01)
     power = Input(0.01)
     cost = Input(0.01) #implement specific range for mass, power, cost (rating on 3?)
+    subsytem_name = Input(None)
+    
 
     # we force width and length to be always equal to 100 mm to adhere to CubeSat form factor!
     width = 100
@@ -56,7 +59,7 @@ class Subsystem(GeomBase):
                 norm_mass = ( row['Mass'] - mass_mean ) / mass_std
                 norm_cost = ( row['Cost'] - cost_mean) / cost_std
 
-                #Norm Power calculated differently for Communication subsystem
+                # Norm Power calculated differently for Communication subsystem
                 if is_comm and tgs is not None:
                     norm_power = (row['Power_DL'] * (tgs / (24*3600)) + row['Power_Nom'] * (1 - (tgs / (24*3600))) - power_mean) / power_std
 
@@ -66,7 +69,7 @@ class Subsystem(GeomBase):
                 else:
                     norm_power = (row['Power'] - power_mean) / power_std
 
-                #Score is calculated using 
+                # Score is calculated using normal distribution 
 
                 if subsystem_name == 'eps':
                     score = (
@@ -126,7 +129,8 @@ class Subsystem(GeomBase):
         """
         return Box(length=self.length, 
                    width=self.width, 
-                   height=self.height)
+                   height=self.height,
+                   tooltip=self.subsystem_type)
     
 
 if __name__ == "__main__":

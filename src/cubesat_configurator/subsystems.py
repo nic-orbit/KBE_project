@@ -1,5 +1,6 @@
 from parapy.core import *
 from parapy.geom import *
+from parapy.exchange.step import STEPReader
 from parapy.core.validate import OneOf, LessThan, GreaterThan, GreaterThanOrEqualTo, IsInstance
 from parapy.core.widgets import (
     Button, CheckBox, ColorPicker, Dropdown, FilePicker, MultiCheckBox,
@@ -14,7 +15,7 @@ from cubesat_configurator import thermal_helpers as th
 
 
 class Payload(ac.Subsystem):
-    
+    color = Input('yellow', widget=ColorPicker)
     #instrument requirements
     instrument_min_operating_temp = Input() # deg C
     instrument_max_operating_temp = Input() # deg C
@@ -39,7 +40,8 @@ class Payload(ac.Subsystem):
     instrument_bit_depth=Input() #range to be defined (1-24) Check gs for inputvalidator
     
     height = Input(instrument_height)
-    cost=Input(instrument_cost) 
+    cost=Input(instrument_cost)
+    subsystem_type = 'Payload' 
     # Thought it would be nice to check if the sensor fits within the limits of the satellite
     # I saw in extreme cases (15 µm & 4k resolution) it can be almost 60 mm long on the long side. 
 
@@ -83,7 +85,7 @@ class Payload(ac.Subsystem):
 #All good 
 class ADCS(ac.Subsystem):
     required_pointing_accuracy = Input()  # deg
-
+    color = Input('green', widget=ColorPicker)
     @required_pointing_accuracy.validator
     def required_pointing_accuracy_validator(self, value):
         if value < 0:
@@ -107,6 +109,7 @@ class ADCS(ac.Subsystem):
     @Attribute
     def adcs_selection(self):
         """Select ADCS subsystem based on payload requirements."""
+        self.subsystem_type = 'ADCS'
         adcs = self.read_adcs_from_csv
         selected = self.component_selection(adcs, self.requirement_key,  self.required_pointing_accuracy, 'less')
         self.height = selected['Height']
@@ -116,7 +119,7 @@ class ADCS(ac.Subsystem):
 class COMM(ac.Subsystem):
     requirement_key = 'Data_Rate'
     required_downlink_data_rate = Input()  # Value needs to come from PASEOS simulation (GB)
-
+    color = Input('red', widget=ColorPicker)
     @required_downlink_data_rate.validator
     def required_downlink_data_rate_validator(self, value):
         if value < 0:
@@ -138,6 +141,7 @@ class COMM(ac.Subsystem):
     @Attribute
     def comm_selection(self):
         """Select Communication subsystem based on downlink data rate requirements."""
+        self.subsystem_type = 'Communication'
         comm = self.read_comm_from_csv
         tgs = self.parent.simulate_first_orbit["comm_window_per_day"]
         selected = self.component_selection(comm, self.requirement_key,  self.required_downlink_data_rate, 'greater', is_comm=True, tgs=tgs)
@@ -149,7 +153,7 @@ class COMM(ac.Subsystem):
 class OBC(ac.Subsystem):
     required_onboard_data_storage = Input()  # Value needs to come from PASEOS simulation (GB)
     requirement_key='Storage'
-
+    color = Input('blue', widget=ColorPicker)
     @required_onboard_data_storage.validator
     def required_onboard_data_storage_validator(self, value):
         if value < 0:
@@ -170,6 +174,7 @@ class OBC(ac.Subsystem):
     @Attribute
     def obc_selection(self):
         """Select OBC subsystem based on payload requirements."""
+        self.subsystem_type = 'Onboard Computer'
         obc = self.read_obc_from_csv()
         obc_selection = self.component_selection(obc, self.requirement_key,  self.required_onboard_data_storage, 'greater')
         self.height = obc_selection['Height']
@@ -240,6 +245,7 @@ class EPS(ac.Subsystem):
     @Attribute
     def battery_selection(self):
         """Select Batteries based on power requirements."""
+        self.subsystem_type = 'EPS'
         requirement_key = 'Capacity'
         bat = self.read_bat_from_csv()
         number_of_cycles = self._mission_lifetime_yrs*365.25*(24*3600/self._time_period)
@@ -254,6 +260,7 @@ class EPS(ac.Subsystem):
             print(req_battery_capacity)
         selected = self.component_selection(bat, requirement_key, req_battery_capacity, 'greater', subsystem_name='eps')
         self.height = selected['Height']
+        color = Input('orange', widget=ColorPicker)
         return selected
     
     @Attribute
@@ -287,57 +294,7 @@ class EPS(ac.Subsystem):
         return (self.req_solar_panel_power/selected_solar_panel['Cost'])
         
 
-class Structure(ac.Subsystem):
-
-    def read_struct_from_csv(self):
-        return self.read_subsystems_from_csv('Structure.csv')
-
-    @Attribute
-    def form_factor(self):
-        "Calculate form factor for cubesat"
-        obc_selection_list=self.parent.obc.obc_selection
-        adcs_selection_list=self.parent.adcs.adcs_selection
-        bat_selection_list=self.parent.power.battery_selection
-        comm_selection_list=self.parent.communication.comm_selection
-        total_height = obc_selection_list['Height'] + adcs_selection_list['Height'] + self.parent.payload.instrument_height + bat_selection_list['Height'] + comm_selection_list['Height']
-        height_factor = total_height / 100
-        
-        if height_factor < 1:
-            form_factor = 1
-        elif height_factor < 1.5:
-            form_factor = 1.5
-        elif height_factor < 2:
-            form_factor = 2
-        elif height_factor < 3:
-            form_factor = 3
-        else:
-            form_factor = "No available Cubesat sizes found"
-        self.height = form_factor*100
-        return form_factor
-
-    @Attribute
-    def structure(self):
-        form_factor_req = self.form_factor
-        struct = self.read_struct_from_csv()
-        struct_selection = []
-
-        for index, row in struct.iterrows():
-            # Compare the required Form Factor value with the requirements from the CSV 
-            if row['Form_Factor'] == form_factor_req:
-                struct_selection.append({
-                    'index': index,
-                    'Form_Factor': row['Form_Factor'],
-                    'Mass': row['Mass'],
-                    'Cost': row['Cost']
-                })
-        if len(struct_selection) == 0:
-            raise ValueError("No suitable component found based on the criteria.") 
-        
-        selected_structure = struct_selection[0]
-        self.mass = selected_structure['Mass']
-        self.cost = selected_structure['Cost']
-        
-        return selected_structure     
+     
 
 class Thermal(ac.Subsystem):
     T_max_in_C = Input()  # deg C
