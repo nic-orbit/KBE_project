@@ -1,173 +1,157 @@
-import numpy as np
-import pandas as pd
-import scipy as sp
-from scipy.optimize import fsolve
-from cubesat_configurator import thermal_helpers as th
-from pprint import pprint
+import itertools
 
-# solar array type
-sa_type = 'Body-mounted'    # 'Body-mounted' or 'Deployable'
-form_factor = 1  # 1, 2 or 3
+class Stacker:
+    def __init__(self, subsystems, fixed_at_bottom=None) -> None:
+        self.subsystems = subsystems
+        self.fixed_at_bottom = fixed_at_bottom
 
-earth_radius = 6371e3  # m
-periapsis = earth_radius + 500e3  # m
-apoapsis = earth_radius + 500e3  # m
+    def calculate_CoM(self, stack):
+        total_mass = sum(sub['mass'] for sub in stack)
+        weighted_sum = 0
 
-sat_mass = 2  # kg mass of satellite
-sat_cp = 900  # J/kgK specific heat capacity of aluminum
+        for sub in stack:
+            sub_CoM = sub['CoM_height'] / 2
+            weighted_sum += sub['mass'] * sub_CoM
 
-T_max_in_C = 50  # deg C
-T_min_in_C = 13  # K
-T_margin = 5  # K
+        CoM = weighted_sum / total_mass
 
-T_max = T_max_in_C + 273.15 - T_margin # K
-T_min = T_min_in_C + 273.15 + T_margin # K
+        return CoM
+    
+    def find_optimal_stacking_order(self, distance_btw_subsystems):
+        min_distance = float('inf') # Initialize minimum distance to infinity
+        optimal_stack = None
 
-t_eclipse = 940  # s
+        # Generate all permutations of subsystems
+        permutations = itertools.permutations(subsystems)
+        
+        # Iterate through all permutations
+        for perm in permutations:
+            if self.fixed_at_bottom and perm[0]['name'] != self.fixed_at_bottom['name']:
+                continue  # Skip permutations that don't have the fixed subsystem at the bottom
+            
+            current_height = 0
+            # Iterate through all subsystems in the permutation
+            for sub in perm:
+                sub['CoM_height'] = current_height + sub['height'] / 2
+                current_height += sub['height'] + distance_btw_subsystems
 
-############
-U = np.array([1, 2, 3], dtype=float)  # form factors
+            total_height = current_height - distance_btw_subsystems # remove the last distance added
 
-# max cross sectional area for all u in U
-A_C_max = np.sqrt(2) * U * 0.01 # m^2
-
-# min cross sectional area for all u in U, same for all form factors
-A_C_min = 0.01 # m^2
-
-# surface area for all u in U
-A_S = (2+4*U) * 0.01 # m^2
-
-# import solar cell coatings from xlsx file
-path_to_sa_coatings = r'C:\Users\nicol\Documents\000SAFE\Git\KBE_project\src\cubesat_configurator\data\thermal_coatings\coatings_NASA_solarcells.csv'
-path_to_body_coatings = r'C:\Users\nicol\Documents\000SAFE\Git\KBE_project\src\cubesat_configurator\data\thermal_coatings\coatings_SMAD_no_dupl.csv'
-
-if sa_type == 'Body-mounted':
-    coatings_df = pd.read_csv(path_to_sa_coatings)
-elif sa_type == 'Deployable':
-    coatings_df = pd.read_csv(path_to_body_coatings)
-else:
-    raise ValueError('Invalid solar array type. Choose "Body-mounted" or "Deployable".')
-
-# set internal heater power to 0 for now
-P_heaters =  0 # W
-Q_internal = 3  # W
-
-####### loop coatings
-for i in range(0, len(coatings_df)):
-    ####### loop form factors
-    for u in range(0, len(U)):
-        T_hot_eq = th.calculate_equilibrium_hot_temp(P_heaters, 
-                                                    Q_internal,
-                                                    coatings_df.loc[i, 'Absorptivity'], 
-                                                    coatings_df.loc[i, 'Emissivity'], 
-                                                    periapsis, 
-                                                    apoapsis, 
-                                                    A_C_max[u], 
-                                                    A_C_min, 
-                                                    A_S[u])  # K
-        T_cold_eq = th.calculate_equilibrium_cold_temp(P_heaters, 
-                                                    Q_internal,
-                                                    coatings_df.loc[i, 'Absorptivity'], 
-                                                    coatings_df.loc[i, 'Emissivity'], 
-                                                    periapsis, 
-                                                    apoapsis, 
-                                                    A_C_max[u], 
-                                                    A_C_min, 
-                                                    A_S[u])  # K
-
-        # final temperatures for design
-        T_hot = T_hot_eq
-        # print(f"for test {T_cold_eq} < {T_hot}")
-        T_cold = th.exact_transient_solution_cooling(T_cold_eq, T_hot, sat_mass, sat_cp, coatings_df.loc[i, 'Emissivity'], A_S[u], t_eclipse)  # K
-
-        coatings_df.loc[i, f'Hot Case {u+1}U'] = T_hot  # K
-        coatings_df.loc[i, f'Cold Case {u+1}U'] = T_cold  # K
-        coatings_df.loc[i, f'Hot Margin {u+1}U'] = T_max - T_hot  # K
-        coatings_df.loc[i, f'Cold Margin {u+1}U'] = T_cold - T_min  # K
-
-# print coatings_df only the margins
-print(coatings_df[['Coating' , 'Hot Margin 1U', 'Cold Margin 1U','Hot Margin 2U', 'Cold Margin 2U', 'Hot Margin 3U',  'Cold Margin 3U']])
-selected_coating = th.select_coating(3, coatings_df)
-
-print(f"Max temp: {T_max} K = {T_max - 273.15} °C")
-print(f"Min temp: {T_min} K = {T_min - 273.15} °C")
-
-pprint(selected_coating)
-
-T_hot = selected_coating['Hot Case']
-T_cold = selected_coating['Cold Case']
-
-def iterate_heater_power(T_initial, T_target, u):
-    T = T_initial
-    P = 0
-    while T < T_target:
-        T_hot_eq = th.calculate_equilibrium_hot_temp(P, 
-                                                    Q_internal,
-                                                    selected_coating['Absorptivity'], 
-                                                    selected_coating['Emissivity'], 
-                                                    periapsis, 
-                                                    apoapsis, 
-                                                    A_C_max[u], 
-                                                    A_C_min, 
-                                                    A_S[u])  # K
-        T_cold_eq = th.calculate_equilibrium_cold_temp(P, 
-                                                    Q_internal,
-                                                    selected_coating['Absorptivity'], 
-                                                    selected_coating['Emissivity'], 
-                                                    periapsis, 
-                                                    apoapsis, 
-                                                    A_C_max[u], 
-                                                    A_C_min, 
-                                                    A_S[u])  # K
-        T_hot = T_hot_eq
-        # print(f"for test {T_cold_eq} < {T_hot}")
-        T = th.exact_transient_solution_cooling(T_cold_eq, T_hot, sat_mass, sat_cp, selected_coating['Emissivity'], A_S[u], t_eclipse)  # K
-        P += 0.001  # increase heater power by 1mW
-
-    return round(P,3)
-
-u = 2
-
-P_heater_iter = iterate_heater_power(T_cold, T_min, u)
+            geometric_center = total_height / 2
+            CoM = calculate_CoM(perm)
+            distance = abs(CoM - geometric_center)
+            
+            if distance < min_distance:
+                self.min_distance = distance
+                self.optimal_stack = perm
+                self.total_height = total_height
+        
+        return optimal_stack, min_distance, total_height
 
 
-def test_heater_power(P, selected_coating):
-    T_hot_eq = th.calculate_equilibrium_hot_temp(P, 
-                                                Q_internal,
-                                                selected_coating['Absorptivity'], 
-                                                selected_coating['Emissivity'], 
-                                                periapsis, 
-                                                apoapsis, 
-                                                A_C_max[u], 
-                                                A_C_min, 
-                                                A_S[u])  # K
-    T_cold_eq = th.calculate_equilibrium_cold_temp(P, 
-                                                Q_internal,
-                                                selected_coating['Absorptivity'], 
-                                                selected_coating['Emissivity'], 
-                                                periapsis, 
-                                                apoapsis, 
-                                                A_C_max[u], 
-                                                A_C_min, 
-                                                A_S[u])  # K
-    T_hot = T_hot_eq
-    # print(f"for test {T_cold_eq} < {T_hot}")
-    T_cold_new = th.exact_transient_solution_cooling(T_cold_eq, T_hot, sat_mass, sat_cp, selected_coating['Emissivity'], A_S[u], t_eclipse)  # K
+# Function to calculate the center of mass for a given stack
+def calculate_CoM(stack):
 
-    assert T_cold_new >= T_min, f"Temperature too low: {T_cold_new} K < {T_min} K"
+    total_mass = sum(sub['mass'] for sub in stack)
+    weighted_sum = 0
 
-    selected_coating['Heater Power'] = P # W
-    selected_coating['Cold Case with Heater'] = T_cold_new  # K
-    selected_coating['Cold Margin with Heater'] = T_cold_new - T_min  # K
+    for sub in stack:
+        sub_CoM = sub['CoM_height'] / 2
+        weighted_sum += sub['mass'] * sub_CoM
 
-    print(f" new heater power:  {P} W")
-    print(f" new Cold Case temperature:  {T_cold_new} K = {T_cold_new - 273.15} °C")
-    print(f" new Cold Case temperature margin:  {T_cold_new - T_min} K")
+    CoM = weighted_sum / total_mass
 
-    return selected_coating
+    return CoM
+
+# Function to find the optimal stacking configuration
+def find_optimal_stacking_order(subsystems, distance_btw_subsystems, fixed_at_bottom=None):
+
+    min_distance = float('inf') # Initialize minimum distance to infinity
+    optimal_stack = None
+    
+    # Generate all permutations of subsystems
+    permutations = itertools.permutations(subsystems)
+    
+    # Iterate through all permutations
+    for perm in permutations:
+        if fixed_at_bottom and perm[0]['name'] != fixed_at_bottom['name']:
+            continue  # Skip permutations that don't have the fixed subsystem at the bottom
+        
+        current_height = 0
+        # Iterate through all subsystems in the permutation
+        for sub in perm:
+            sub['CoM_height'] = current_height + sub['height'] / 2
+            current_height += sub['height'] + distance_btw_subsystems
+
+        total_height = current_height - distance_btw_subsystems # remove the last distance added
+
+        geometric_center = total_height / 2
+        CoM = calculate_CoM(perm)
+        distance = abs(CoM - geometric_center)
+        
+        if distance < min_distance:
+            min_distance = distance
+            optimal_stack = perm
+    
+    return optimal_stack, min_distance, total_height
 
 
-final_selection = test_heater_power(P_heater_iter, selected_coating)
+def display_stacking(stack, total_height):
+    # print stacking order, showing the subsystem name and CoM height; the top one first
+    for sub in reversed(stack):
+        print(f"{sub['name']} (CoM height: {sub['CoM_height']}; height: {sub['height']}; mass: {sub['mass']})")
+    
+    # print the total height of the stack 
+    print(f"\nTotal height: {total_height}")
+    # print the geometric center of the stack
+    geometric_center = total_height / 2
+    print(f"Geometric center: {geometric_center}")
+    # print the calculated CoM of the stack
+    CoM_total = calculate_CoM(stack)
+    print(f"Calculated CoM of the stack: {CoM_total}")
+    # print the minimum distance between the CoM and the geometric center
+    CoM_distance = CoM_total - geometric_center
+    print(f"Minimum distance from CoM to geometric center: {CoM_distance}")
 
-print("\nFinal selection:")
-pprint(final_selection)
+
+def calculate_form_factor_and_spare_space(total_height):
+    if total_height < 100:
+        form_factor = 1
+    elif total_height < 150:
+        form_factor = 1.5
+    elif total_height < 200:
+        form_factor = 2
+    elif total_height < 300:
+        form_factor = 3
+    else:
+        raise ValueError("Total height exceeds maximum form factor of 3")
+    spare_space = 100*form_factor - total_height
+    return form_factor, spare_space
+    
+
+if __name__ == "__main__":
+
+    # Subsystems data
+    payload = {'name': 'payload', 'mass': 300, 'height': 70, 'CoM_height': None}
+    adcs = {'name': 'adcs', 'mass': 500, 'height': 60, 'CoM_height': None}
+    power = {'name': 'power', 'mass': 100, 'height': 50, 'CoM_height': None}
+    obc = {'name': 'obc', 'mass': 100, 'height': 30, 'CoM_height': None}
+    comms = {'name': 'comms', 'mass': 100, 'height': 30, 'CoM_height': None}
+
+    subsystems = [payload, adcs, power, obc, comms]
+
+    # calculate distance between subsystems based on stack height and spare space in the cubesat
+    total_height = sum(sub['height'] for sub in subsystems)
+
+    form_factor, spare_space = calculate_form_factor_and_spare_space(total_height)
+
+    distance_btw_subsystems = spare_space / (len(subsystems) - 1)
+    # distance_btw_subsystems = 0
+
+    print(f"\nDistance between subsystems: {distance_btw_subsystems} mm")
+
+    
+
+    optimal_stacking_order, min_distance, total_height = find_optimal_stacking_order(subsystems, distance_btw_subsystems, fixed_at_bottom=payload)
+
+    display_stacking(optimal_stacking_order, total_height)

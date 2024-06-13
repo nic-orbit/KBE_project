@@ -318,7 +318,7 @@ class Thermal(ac.Subsystem):
     @Attribute
     def form_factor(self):
         # return self.parent.structure.form_factor
-        return 2 
+        return 2  # TODO get form factor from structure
     
     @Attribute
     def apoapsis(self):
@@ -331,7 +331,7 @@ class Thermal(ac.Subsystem):
     @Attribute
     def satellite_mass(self):
         # return self.parent.mass
-        return 2  # kg mass of satellite
+        return 2  # kg mass of satellite # TODO get mass from satellite
     
     @Attribute
     def eclipse_time(self):
