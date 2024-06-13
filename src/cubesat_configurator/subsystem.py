@@ -1,6 +1,7 @@
 from parapy.core import *
 from parapy.geom import *
 from parapy.core.validate import OneOf, LessThan, GreaterThan, GreaterThanOrEqualTo
+from parapy.core.widgets import ColorPicker, CheckBox, FilePicker, Dropdown
 import os
 import pandas as pd
 
@@ -9,6 +10,8 @@ class Subsystem(GeomBase):
     mass = Input(0.01)
     power = Input(0.01)
     cost = Input(0.01) #implement specific range for mass, power, cost (rating on 3?)
+    subsytem_name = Input(None)
+    
 
     # we force width and length to be always equal to 100 mm to adhere to CubeSat form factor!
     width = 100
@@ -27,25 +30,27 @@ class Subsystem(GeomBase):
         """
         filtered_list = []
 
-        # calculate mean and standard deviation of Mass Cost and Power
+        # calculate mean and standard deviation of Mass and Cost 
         mass_mean = component['Mass'].mean()
         mass_std = component['Mass'].std()
         cost_mean = component['Cost'].mean()
         cost_std = component['Cost'].std()
 
-        # For communication subsystem, calculate a combined power value
+        # For communication subsystem, calculate a combined power value, Power mean and standard deviations are calculated differently 
         if is_comm and tgs is not None:
             power_combined = component['Power_DL'] * (tgs / (24*3600)) + component['Power_Nom'] * (1 - (tgs / (24*3600)))
             power_mean = power_combined.mean()
             power_std = power_combined.std()
-        
+
+        # For Power subsystem, score is calculated without the power factor 
         elif subsystem_name == 'eps':
             power_mean = 0
             power_std = 0
         else:
             power_mean = component['Power'].mean()
             power_std = component['Power'].std()
-         
+
+        # Returns components from list that satisfy the filter value 
         for index, row in component.iterrows():
             if comparator == 'greater':
                 FILTER_CONDITION = row[filter_key] > filter_value
@@ -54,9 +59,9 @@ class Subsystem(GeomBase):
 
             if FILTER_CONDITION:
                 norm_mass = ( row['Mass'] - mass_mean ) / mass_std
-                # norm_power = ( row['Power'] - power_mean) / power_std
                 norm_cost = ( row['Cost'] - cost_mean) / cost_std
 
+                # Norm Power calculated differently for Communication subsystem
                 if is_comm and tgs is not None:
                     norm_power = (row['Power_DL'] * (tgs / (24*3600)) + row['Power_Nom'] * (1 - (tgs / (24*3600))) - power_mean) / power_std
 
@@ -65,6 +70,8 @@ class Subsystem(GeomBase):
 
                 else:
                     norm_power = (row['Power'] - power_mean) / power_std
+
+                # Score is calculated using normal distribution 
 
                 if subsystem_name == 'eps':
                     score = (
@@ -124,7 +131,8 @@ class Subsystem(GeomBase):
         """
         return Box(length=self.length, 
                    width=self.width, 
-                   height=self.height)
+                   height=self.height,
+                   tooltip=self.subsystem_type)
     
 
 if __name__ == "__main__":
