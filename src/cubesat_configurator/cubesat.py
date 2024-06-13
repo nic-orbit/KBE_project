@@ -42,7 +42,7 @@ class CubeSat(GeomBase):
         """
         power = 0
         for child in self.children:
-            if isinstance(child, ac.Subsystem) and hasattr(child, "power"):
+            if isinstance(child, ac.Subsystem) and hasattr(child, "power") and child.power is not None:
                 power += child.power
         return power*(1 + constants.SystemConfig.system_margin) # W
 
@@ -620,8 +620,7 @@ class CubeSat(GeomBase):
         """
         Returns an instance of the EPS class.
         """
-        return subsys.EPS(time_period=self.simulate_first_orbit["time_period"], 
-                          eclipse_time=self.simulate_first_orbit["eclipse_time_per_orbit"])
+        return subsys.EPS(eclipse_time=self.simulate_first_orbit["eclipse_time_per_orbit"])
     
     @Part
     def obc(self):

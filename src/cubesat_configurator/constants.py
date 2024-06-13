@@ -34,3 +34,8 @@ class SystemConfig:
 class GenericConfig:
     relative_step_file_path = os.path.join(script_dir, 'step_files', 'step_file.step')
     step_file_location = os.path.join(script_dir, relative_step_file_path)
+
+class Power:
+    duty_cycle = 0.1
+    F_d=0.0092
+    I_d=0.955

@@ -109,7 +109,7 @@ class ADCS(ac.Subsystem):
         """Select ADCS subsystem based on payload requirements."""
         adcs = self.read_adcs_from_csv
         selected = self.component_selection(adcs, self.requirement_key,  self.required_pointing_accuracy, 'less')
-
+        self.height = selected['Height']
         return selected
 
 #All good    
@@ -141,7 +141,7 @@ class COMM(ac.Subsystem):
         comm = self.read_comm_from_csv
         tgs = self.parent.simulate_first_orbit["comm_window_per_day"]
         selected = self.component_selection(comm, self.requirement_key,  self.required_downlink_data_rate, 'greater', is_comm=True, tgs=tgs)
-
+        self.height=selected['Height']
         return selected
     
 
@@ -149,6 +149,7 @@ class COMM(ac.Subsystem):
 class OBC(ac.Subsystem):
     required_onboard_data_storage = Input()  # Value needs to come from PASEOS simulation (GB)
     requirement_key='Storage'
+
     @required_onboard_data_storage.validator
     def required_onboard_data_storage_validator(self, value):
         if value < 0:
@@ -170,60 +171,121 @@ class OBC(ac.Subsystem):
     def obc_selection(self):
         """Select OBC subsystem based on payload requirements."""
         obc = self.read_obc_from_csv()
-        return self.component_selection(obc, self.requirement_key,  self.required_onboard_data_storage, 'greater')
+        obc_selection = self.component_selection(obc, self.requirement_key,  self.required_onboard_data_storage, 'greater')
+        self.height = obc_selection['Height']
+        return obc_selection
     
 
 class EPS(ac.Subsystem):
     
-    Solar_panel_type = Input(default='Body_mounted', widget=Dropdown(['Body_mounted', 'Deployable']))
-    requirement_key = 'Power'
-    time_period = Input()
+    Solar_cell_type = Input(default='Triple Junction GaAs rigid', widget=Dropdown(['Si rigid panel', 'HES Flexible array','Triple Junction GaAs rigid', 'Triple Junction GaAs ultraflex']))
+    
     eclipse_time = Input()
-  
 
     def read_SolarPanel_from_csv(self):
-        return self.read_subsystems_from_csv('Solar_Panel.csv')
+        sp=self.read_subsystems_from_csv('Solar_Panel.csv')
+        selected_panel = sp[sp['Type'] == self.Solar_cell_type]
+        return (selected_panel.iloc[0])
     
     def read_bat_from_csv(self):
         return self.read_subsystems_from_csv('Battery.csv')
     
     @Attribute
-    def avg_power_comm(self):
-        comm_selection = self.parent.communication.comm_selection
+    def _time_period(self):
+        return self.parent.orbit.period
+    
+    @Attribute
+    def _mission_lifetime_yrs(self):
+        return (self.parent.parent.mission_lifetime/12)
+    
+    @Attribute
+    def _communication_power(self):
+        return self.parent.communication.comm_selection
+    
+    @Attribute
+    def _obc_power(self):
+        return self.parent.obc.obc_selection['Power']
+    
+    @Attribute
+    def _adcs_power(self):
+        return self.parent.adcs.adcs_selection['Power']
+    
+    @Attribute
+    def _thermal_power(self):
+        return self.parent.thermal.power
+    
+    @Attribute
+    def _payload_power(self):
+        return self.parent.payload.instrument_power_consumption
+    
+    @Attribute
+    def avg_power_communication(self):
         tgs = self.parent.simulate_first_orbit["comm_window_per_day"]  # input from Paseos
-        avg_power_comm = 0
-        power_comm = comm_selection['Power_DL'] * (tgs / (24*3600)) + comm_selection['Power_Nom'] * (1 - (tgs / (24*3600)))  # tgs = communication time per day
-        avg_power_comm += power_comm
-        return avg_power_comm
+        power_communication = self._communication_power['Power_DL'] * (tgs / (24*3600)) + self._communication_power['Power_Nom'] * (1 - (tgs / (24*3600)))  # tgs = communication time per day       
+        return power_communication
 
-    
     @Attribute
-    def total_power_required(self):
-        obc_selection_list = self.parent.obc.obc_selection
-        adcs_selection_list = self.parent.adcs.adcs_selection
-        total_power = (self.avg_power_comm + obc_selection_list['Power'] + adcs_selection_list['Power'] + self.parent.payload.instrument_power_consumption) * (1 + constants.SystemConfig.system_margin)
+    def eclipse_power(self):
+        return(self._adcs_power * constants.Power.duty_cycle + self._communication_power['Power_Nom'] + self._obc_power + self._payload_power + self._thermal_power)
+
+    @Attribute
+    def eclipse_power_without_COM(self):
+        return(self._adcs_power * constants.Power.duty_cycle + self._obc_power + self._payload_power + self._thermal_power)
+
+    @Attribute
+    def average_power_required(self):
+        total_power = (self._adcs_power * constants.Power.duty_cycle + self.avg_power_communication + self._obc_power + self._payload_power + self._thermal_power * (self.eclipse_time/self._time_period))
         return total_power
-
-    
-    @Attribute
-    def solar_panel_selection(self):
-        """Select Solar Panels based on power requirements."""
-        sp = self.read_SolarPanel_from_csv()
-        T = self.time_period  
-        solar_panel_power_req = self.total_power_required * (T / (1 - self.eclipse_time))
-        filtered_sp = sp[sp['Type'] == self.Solar_panel_type]
-        # return filtered_sp
-        return self.component_selection(filtered_sp, self.requirement_key, solar_panel_power_req, 'greater')
-    
 
     @Attribute
     def battery_selection(self):
         """Select Batteries based on power requirements."""
+        requirement_key = 'Capacity'
         bat = self.read_bat_from_csv()
-        T = self.time_period  
-        battery_power_req = self.total_power_required * (T / self.eclipse_time)
-        return self.component_selection(bat, self.requirement_key, battery_power_req, 'greater')
+        number_of_cycles = self._mission_lifetime_yrs*365.25*(24*3600/self._time_period)
+        print(number_of_cycles)
+        state_of_charge_min =  (-162.1584 + 26.7349 * np.log(number_of_cycles))*0.01 
+        print(state_of_charge_min)
+        req_battery_capacity = state_of_charge_min * self.eclipse_time * self.eclipse_power/3600
+        print(req_battery_capacity)
 
+        if req_battery_capacity > bat['Capacity'].max():
+            req_battery_capacity = state_of_charge_min * self.eclipse_time * self.eclipse_power_without_COM
+            print(req_battery_capacity)
+        selected = self.component_selection(bat, requirement_key, req_battery_capacity, 'greater', subsystem_name='eps')
+        self.height = selected['Height']
+        return selected
+    
+    @Attribute
+    def req_solar_panel_power(self):
+        required_power = (self.average_power_required*(1-(self.eclipse_time/self._time_period))) + (self.eclipse_power * (self.eclipse_time/self._time_period))
+        return (required_power)
+    
+    @Attribute
+    def _solar_panel_fluxEOL(self):
+        """Select Solar Panels based on power requirements."""
+        selected_solar_panel=self.read_SolarPanel_from_csv()
+        Flux_solar = selected_solar_panel['Efficiency'] * constants.Thermal.S
+        Flux_BOL = Flux_solar * constants.Power.I_d
+        L_D = (1-constants.Power.F_d)**(self._mission_lifetime_yrs)
+        Flux_EOL = Flux_BOL * L_D 
+        return Flux_EOL
+    
+    @Attribute
+    def solar_panel_area(self):
+        area = self.req_solar_panel_power/self._solar_panel_fluxEOL
+        return area
+    
+    @Attribute
+    def solar_panel_mass(self):
+        selected_solar_panel = self.read_SolarPanel_from_csv()
+        return (self.req_solar_panel_power/selected_solar_panel['Specific_power'] * 1000)
+    
+    @Attribute
+    def solar_panel_cost(self):
+        selected_solar_panel = self.read_SolarPanel_from_csv()
+        return (self.req_solar_panel_power/selected_solar_panel['Cost'])
+        
 
 class Structure(ac.Subsystem):
 
@@ -233,12 +295,11 @@ class Structure(ac.Subsystem):
     @Attribute
     def form_factor(self):
         "Calculate form factor for cubesat"
-        form_factor_eps=self.parent.power.solar_panel_selection['Form_factor']
         obc_selection_list=self.parent.obc.obc_selection
         adcs_selection_list=self.parent.adcs.adcs_selection
         bat_selection_list=self.parent.power.battery_selection
         comm_selection_list=self.parent.communication.comm_selection
-        total_height=obc_selection_list['Height'] + adcs_selection_list['Height'] + self.parent.payload.instrument_height + bat_selection_list['Height'] + comm_selection_list['Height']
+        total_height = obc_selection_list['Height'] + adcs_selection_list['Height'] + self.parent.payload.instrument_height + bat_selection_list['Height'] + comm_selection_list['Height']
         height_factor = total_height / 100
         
         if height_factor < 1:
@@ -251,30 +312,32 @@ class Structure(ac.Subsystem):
             form_factor = 3
         else:
             form_factor = "No available Cubesat sizes found"
-        
-        req_form_factor=max(form_factor_eps,form_factor)
-        return req_form_factor
+        self.height = form_factor*100
+        return form_factor
 
     @Attribute
     def structure(self):
         form_factor_req = self.form_factor
-
         struct = self.read_struct_from_csv()
         struct_selection = []
 
         for index, row in struct.iterrows():
-            # Compare the data rate value from the CSV with the user-provided data rate
+            # Compare the required Form Factor value with the requirements from the CSV 
             if row['Form_Factor'] == form_factor_req:
-                
-                # Add the row to the list of selected options as a dictionary
                 struct_selection.append({
                     'index': index,
                     'Form_Factor': row['Form_Factor'],
                     'Mass': row['Mass'],
                     'Cost': row['Cost']
                 })
-
-        return struct_selection     
+        if len(struct_selection) == 0:
+            raise ValueError("No suitable component found based on the criteria.") 
+        
+        selected_structure = struct_selection[0]
+        self.mass = selected_structure['Mass']
+        self.cost = selected_structure['Cost']
+        
+        return selected_structure     
 
 class Thermal(ac.Subsystem):
     T_max_in_C = Input()  # deg C
@@ -310,10 +373,6 @@ class Thermal(ac.Subsystem):
     @Attribute
     def T_min_with_margin_in_K(self):
         return self.T_min_in_C + 273.15 + self.T_margin # K
-
-    @Attribute
-    def sa_type(self):
-        return self.parent.power.Solar_panel_type
     
     @Attribute
     def form_factor(self):
@@ -339,12 +398,7 @@ class Thermal(ac.Subsystem):
     
     @Attribute
     def coatings_df(self):
-        if self.sa_type == 'Body_mounted':
-            return pd.read_csv(os.path.join(os.path.dirname(__file__), 'data/thermal_coatings/coatings_NASA_solarcells.csv'))
-        elif self.sa_type == 'Deployable':
             return pd.read_csv(os.path.join(os.path.dirname(__file__), 'data/thermal_coatings/coatings_SMAD_no_dupl.csv'))
-        else:
-            raise ValueError('Invalid solar array type. Choose "Body_mounted" or "Deployable".')
         
     @Attribute
     def Q_internal(self):
