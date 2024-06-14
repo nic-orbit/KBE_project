@@ -8,19 +8,20 @@ import math
 
 
 class Structure(ac.Subsystem):
-    form_factor = Input(3)
-    
+    form_factor = Input(1.5)
+    number_of_spacers = Input(6, validator=LessThan(0))
+
     @Attribute
     def subsystem_data_for_stacking(self):
         """
         Returns a list of dictionaries with the height, mass and name of each subsystem.
         """
         # Subsystems data
-        payload = {'name': 'Payload', 'mass': 300, 'height': 70, 'CoM_Location': None}
-        adcs = {'name': 'ADCS', 'mass': 500, 'height': 60, 'CoM_Location': None}
-        power = {'name': 'EPS', 'mass': 100, 'height': 50, 'CoM_Location': None}
-        obc = {'name': 'OBC', 'mass': 100, 'height': 30, 'CoM_Location': None}
-        comms = {'name': 'COMM', 'mass': 100, 'height': 30, 'CoM_Location': None}
+        payload = {'name': 'Payload', 'mass': 500, 'height': 50, 'CoM_Location': None}
+        adcs = {'name': 'ADCS', 'mass': 400, 'height': 32, 'CoM_Location': None}
+        power = {'name': 'EPS', 'mass': 130, 'height': 12, 'CoM_Location': None}
+        obc = {'name': 'OBC', 'mass': 25, 'height': 10, 'CoM_Location': None}
+        comms = {'name': 'COMM', 'mass': 25, 'height': 7, 'CoM_Location': None}
 
         subsystems = [payload, adcs, power, obc, comms]
         
@@ -34,11 +35,11 @@ class Structure(ac.Subsystem):
         # find 'Payload' subsystem and fix it at the bottom of the stack
         fixed_at_bottom = next(sub for sub in self.subsystem_data_for_stacking if sub['name'] == 'Payload')
         
-        optimal_stack = self._find_optimal_stacking_order(self.subsystem_data_for_stacking, self.form_factor, fixed_at_bottom)
-        
+        optimal_stack = self._find_optimal_stacking_order(self.subsystem_data_for_stacking, fixed_at_bottom)
+        return optimal_stack
 
     
-    def _find_optimal_stacking_order(self, subsystems, form_factor, fixed_at_bottom=None):
+    def _find_optimal_stacking_order(self, subsystems, fixed_at_bottom=None):
 
         min_distance = float('inf') # Initialize minimum distance to infinity
         optimal_stack = None
@@ -46,11 +47,15 @@ class Structure(ac.Subsystem):
         subsystems_list = subsystems.copy()
 
         # calculate leftover space for spacers
-        space_for_spacers = 100*form_factor - sum(sub['height'] for sub in subsystems_list)
+        space_for_spacers = 100*self.form_factor - sum(sub['height'] for sub in subsystems_list)
         # round down to the nearest integer
-        spacer_size = 10 # mm
-        num_spacers = int(space_for_spacers // spacer_size)
+        num_spacers = self.number_of_spacers 
+        spacer_size = space_for_spacers / num_spacers if num_spacers > 0 else 0 # mm
         print(f"Space for spacers: {space_for_spacers} mm")
+
+        # remove the fixed subsystem from the list 
+        subsystems_list.remove(fixed_at_bottom)
+
         
         # append spacers to the end of the subsystems list
         for i in range(num_spacers):
@@ -58,16 +63,16 @@ class Structure(ac.Subsystem):
 
         print('\nstart permutating...')
 
-        permutations = itertools.permutations(subsystems_list)
+        all_permutations = itertools.permutations(subsystems_list)
         
-        perm_list = []
+        
         i = 0
-        
         # Iterate through all permutations
-        for perm in permutations:
+        for perm in all_permutations:
             i += 1
-            if fixed_at_bottom and perm[0]['name'] != fixed_at_bottom['name']:
-                continue  # Skip permutations that don't have the fixed subsystem at the bottom
+
+            # add fixed_at_bottom to the beginning of the permutation
+            perm = [fixed_at_bottom] + list(perm)
             
             current_height = 0
             # Iterate through all subsystems in the permutation
@@ -91,8 +96,8 @@ class Structure(ac.Subsystem):
                 optimal_stack = perm_sorted
                 self._display_stacking(perm_sorted, total_height)
         
-            # stop when the optimal stacking order is zero
-            if min_distance == 0:
+            # stop when distance of Center of Mass to Geometric Center is less than 1 mm
+            if abs(min_distance) <= 1:
                 break
 
         # calculate number of permutations
@@ -101,6 +106,7 @@ class Structure(ac.Subsystem):
         # print the number of permutations
         print(f"Number of permutations: {N_perm}\n"
               f"\nNumber of iterations: {i}")
+        print(f"Number of considered permutations: {len(list(all_permutations))}")
         # return last item of the list, which is the optimal stacking order
         return optimal_stack
 
@@ -136,15 +142,10 @@ class Structure(ac.Subsystem):
         print(f"Minimum distance from CoM to geometric center: {CoM_distance}")
         print('-----------------------------------\n')
 
-    # @Attribute
-    # def CoM(self):
-    #     return Point(x=0.5*self.width, y=0.5*self.length, z=0.5*self.height)
-
-    
-
+        
 if __name__ == "__main__":
 
     structure = Structure()
     structure.optimal_stacking_order
     
-    # display(structure)
+    display(structure)
