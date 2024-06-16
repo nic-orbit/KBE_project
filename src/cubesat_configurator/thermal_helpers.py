@@ -99,12 +99,12 @@ def thermal_equilibrium_temp(Q_in, emissivity, surface_area):
     T_eq = (Q_in / (emissivity * boltzmann_constant * surface_area))**(1/4)  # K
     return T_eq
 
-def select_coating(form_factor:int, coatings_df:pd.DataFrame) -> dict:
+def select_coating(form_factor:float, coatings_df:pd.DataFrame) -> dict:
     """
     Select the best coating based on the form factor and the margin.
 
     Parameters:
-    form_factor: The form factor of the satellite. Can be 1, 2, or 3.
+    form_factor: The form factor of the satellite. Can be 1, 1.5, 2, or 3.
     coatings_df: A pandas dataframe containing the coating data.
     """
     # filter out coatings that are not feasible for the given form factor in the hot case

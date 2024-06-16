@@ -24,7 +24,7 @@ To generate .png files to check:
 ```console
 pyreverse . -m y -o png
 ```
-generate .dot files
+generate .dot files (exclude -m y if you do not want the )
 ```console
 pyreverse . -m y
 ```

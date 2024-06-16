@@ -21,34 +21,15 @@ class Payload(ac.Subsystem):
     instrument_min_operating_temp = Input() # deg C
     instrument_max_operating_temp = Input() # deg C
     #instrument characteristics
-    #### data_rate is a Attribute and inputs are image pixel resolution 
-    #### and pixel depth and number of images per day
-    # instrument_data_rate = Input() # kbps
     instrument_focal_length = Input() # mm
     instrument_pixel_size = Input() # µm
-    instrument_power_consumption = Input() # W
-    instrument_mass = Input() # kg
-    instrument_cost = Input() # USD
-    ### maybe we can delete these and use just height, width and length?
-    instrument_height = Input() # mm
-    instrument_width = Input() # mm
-    instrument_length = Input() # mm
-    ### maybe we can delete these and use just height, width and length?
-    # I feel like images per day should be on mission level?
-    # instrument_image_width=Input()
-    # instrument_image_length=Input()
     instrument_pixel_resolution=Input() # range to be defined or we split this into w and h, consider list
     instrument_bit_depth=Input() #range to be defined (1-24) Check gs for inputvalidator
-    
-    mass = Input(instrument_mass)
-    height = Input(instrument_height)
-    cost=Input(instrument_cost)
-    subsystem_type = 'Payload' 
-    # Thought it would be nice to check if the sensor fits within the limits of the satellite
-    # I saw in extreme cases (15 µm & 4k resolution) it can be almost 60 mm long on the long side. 
+
+    subsystem_type = 'Payload'  
 
     @Attribute
-    def instrument_images_per_day(self):
+    def _instrument_images_per_day(self):
         return self.parent.parent.number_of_images_per_day
 
     @Attribute
@@ -63,10 +44,7 @@ class Payload(ac.Subsystem):
         """
         Calculates the number of pixels in the image based on the instrument pixel resolution.
         """
-        # if we use a list:
         return self.instrument_pixel_resolution[0]*self.instrument_pixel_resolution[1] # pixels
-        # if we use separate values for width and height:
-        # return self.instrument_resolution_width*self.instrument_resolution_height
 
     @Attribute
     def image_size(self):
@@ -81,121 +59,190 @@ class Payload(ac.Subsystem):
         Payload data rate calculation based on the instrument characteristics.
         PLDR = (Number_of_pixels * Bit_depth [bits] * Number_of_images_per_day) / seconds per day * 1E-3 [kbps]
         """
-        instrument_data_per_day = self.image_size*self.instrument_images_per_day # kbits
+        instrument_data_per_day = self.image_size*self._instrument_images_per_day # kbits
         return ( instrument_data_per_day ) / ( pk.DAY2SEC ) # kbps
     
-#All good 
+
 class ADCS(ac.Subsystem):
+    """
+    ADCS class for managing and selecting the appropriate ADCS component based on required pointing accuracy.
+
+    """ 
     required_pointing_accuracy = Input()  # deg
     color = Input('green', widget=ColorPicker)
+    
     @required_pointing_accuracy.validator
     def required_pointing_accuracy_validator(self, value):
+        """
+        Validates the required pointing accuracy, indicating validation success and error message if applicable.
+
+        """
         if value < 0:
-            msg =  self.requirement_key + " cannot be negative"
-            return False, msg
+            return False, f"{self.requirement_key} cannot be negative"
         
         adcs_df = self.read_adcs_from_csv
-        # find minimum Pointing Accuracy value from the CSV
         min_pa = adcs_df[self.requirement_key].min()
         if value < min_pa:
-            msg = "Required " + self.requirement_key + f" cannot be lower than {min_pa} deg, because it is the minimum value in the database."
-            return False, msg
+            return False, f"Required {self.requirement_key} cannot be lower than {min_pa} deg."
+        
         return True
     
     requirement_key = 'Pointing_Accuracy'
     
     @Attribute
     def read_adcs_from_csv(self):
+        """
+        Reads the ADCS data from a CSV file.
+
+        Returns:
+            DataFrame: ADCS data.
+        """
         return self.read_subsystems_from_csv('ADCS.csv')
 
     @Attribute
     def adcs_selection(self):
-        """Select ADCS subsystem based on payload requirements."""
+        """
+        Selects the ADCS subsystem based on payload requirements.
+
+        Returns:
+            DataFrame: Selected ADCS component details.
+        """
         self.subsystem_type = 'ADCS'
         adcs = self.read_adcs_from_csv
-        selected = self.component_selection(adcs, self.requirement_key,  self.required_pointing_accuracy, 'less')
+        selected = self.component_selection(adcs, self.requirement_key, self.required_pointing_accuracy, 'less')
         self.height = selected['Height']
         return selected
 
-#All good    
+  
 class COMM(ac.Subsystem):
+    """
+    COMM class for managing and selecting the appropriate communication subsystem based on required downlink data rate.
+
+    """
     requirement_key = 'Data_Rate'
     required_downlink_data_rate = Input()  # Value needs to come from PASEOS simulation (GB)
     color = Input('red', widget=ColorPicker)
+    
     @required_downlink_data_rate.validator
     def required_downlink_data_rate_validator(self, value):
+        """
+        Validates the required downlink data rate.
+
+        Checks that the downlink data rate is non-negative and does not exceed the maximum value in the database.
+
+        """
         if value < 0:
-            msg = "Onboard data rate cannot be negative"
-            return False, msg
+            return False, "Onboard data rate cannot be negative"
         
         comms_df = self.read_comm_from_csv
-        # find maximum data rate value from the CSV
         max_data_rate = comms_df['Data_Rate'].max()
         if value > max_data_rate:
-            msg = f"Required onboard data storage cannot exceed {max_data_rate} kbps, because it is the maximum value in the database."
-            return False, msg
+            return False, f"Required onboard data storage cannot exceed {max_data_rate} kbps."
+        
         return True
     
     @Attribute
     def read_comm_from_csv(self):
+        """
+        Reads the communication subsystem data from a CSV file.
+
+        Returns:
+            DataFrame: Communication subsystem data.
+        """
         return self.read_subsystems_from_csv('Communication_subsystem.csv')
     
     @Attribute
     def comm_selection(self):
-        """Select Communication subsystem based on downlink data rate requirements."""
+        """
+        Selects the communication subsystem based on downlink data rate requirements.
+
+        Returns:
+            DataFrame: Selected communication subsystem details.
+        """
         self.subsystem_type = 'Communication'
         comm = self.read_comm_from_csv
         tgs = self.parent.simulate_first_orbit["comm_window_per_day"]
-        selected = self.component_selection(comm, self.requirement_key,  self.required_downlink_data_rate, 'greater', is_comm=True, tgs=tgs)
-        self.height=selected['Height']
+        selected = self.component_selection(comm, self.requirement_key, self.required_downlink_data_rate, 'greater', is_comm=True, tgs=tgs)
+        self.height = selected['Height']
         return selected
-    
 
-#All good 
+    
 class OBC(ac.Subsystem):
+    """
+    OBC class for managing and selecting the appropriate onboard computer subsystem based on required onboard data storage.
+
+    """
+    
     required_onboard_data_storage = Input()  # Value needs to come from PASEOS simulation (GB)
-    requirement_key='Storage'
+    requirement_key = 'Storage'
     color = Input('blue', widget=ColorPicker)
+    
     @required_onboard_data_storage.validator
     def required_onboard_data_storage_validator(self, value):
+        """
+        Validates the required onboard data storage and checks that the onboard data storage is non-negative and does not exceed the maximum value in the database.
+
+        """
         if value < 0:
-            msg = "Onboard data storage cannot be negative"
-            return False, msg
+            return False, "Onboard data storage cannot be negative"
         
         comms_df = self.read_obc_from_csv()
-        # find maximum data storage value from the CSV
         max_storage = comms_df['Storage'].max()
         if value > max_storage:
-            msg = f"Required onboard data storage cannot exceed {max_storage} GB, because it is the maximum value in the database."
-            return False, msg
+            return False, f"Required onboard data storage cannot exceed {max_storage} GB."
+        
         return True
     
     def read_obc_from_csv(self):
+        """
+        Reads the onboard computer subsystem data from a CSV file.
+
+        Returns:
+            DataFrame: Onboard computer subsystem data.
+        """
         return self.read_subsystems_from_csv('OBC.csv')
 
     @Attribute
     def obc_selection(self):
-        """Select OBC subsystem based on payload requirements."""
+        """
+        Selects the OBC subsystem that meets the required data storage.
+
+        Returns:
+            DataFrame: Selected onboard computer subsystem details.
+        """
         self.subsystem_type = 'Onboard Computer'
         obc = self.read_obc_from_csv()
-        obc_selection = self.component_selection(obc, self.requirement_key,  self.required_onboard_data_storage, 'greater')
+        obc_selection = self.component_selection(obc, self.requirement_key, self.required_onboard_data_storage, 'greater')
         self.height = obc_selection['Height']
         return obc_selection
+
     
 
 class EPS(ac.Subsystem):
+    """
+    Electrical Power Subsystem (EPS) module for satellite system.
+    This class calculates various parameters related to the EPS including power requirements,
+    battery selection, solar panel selection, etc.
+    """
+
     color = Input('Aqua', widget=ColorPicker)
-    
-    Solar_cell_type = Input(default='Triple Junction GaAs rigid', widget=Dropdown(['Si rigid panel', 'HES Flexible array','Triple Junction GaAs rigid', 'Triple Junction GaAs ultraflex']))
-    
     eclipse_time = Input()
 
+    "Select type of Solar Panel from dropdown menu"
+    Solar_cell_type = Input(default='Triple Junction GaAs rigid', widget=Dropdown(['Si rigid panel', 'HES Flexible array','Triple Junction GaAs rigid', 'Triple Junction GaAs ultraflex']))
+ 
     def read_SolarPanel_from_csv(self):
+        """
+        Read solar panel data from CSV file based on the selected type.
+        """
         sp=self.read_subsystems_from_csv('Solar_Panel.csv')
         selected_panel = sp[sp['Type'] == self.Solar_cell_type]
         return (selected_panel.iloc[0])
     
     def read_bat_from_csv(self):
+        """
+        Read battery data from CSV file.
+        """
         return self.read_subsystems_from_csv('Battery.csv')
     
     @Attribute
@@ -206,6 +253,7 @@ class EPS(ac.Subsystem):
     def _mission_lifetime_yrs(self):
         return (self.parent.parent.mission_lifetime/12)
     
+    "Collect power data from all other subsystems"
     @Attribute
     def _communication_power(self):
         return self.parent.communication.comm_selection
@@ -224,10 +272,13 @@ class EPS(ac.Subsystem):
     
     @Attribute
     def _payload_power(self):
-        return self.parent.payload.instrument_power_consumption
+        return self.parent.payload.power
     
     @Attribute
     def avg_power_communication(self):
+        """
+        Average power consumption for communication per day.
+        """
         tgs = self.parent.simulate_first_orbit["comm_window_per_day"]  # input from Paseos
         power_communication = self._communication_power['Power_DL'] * (tgs / (24*3600)) + self._communication_power['Power_Nom'] * (1 - (tgs / (24*3600)))  # tgs = communication time per day       
         return power_communication
@@ -242,8 +293,37 @@ class EPS(ac.Subsystem):
 
     @Attribute
     def average_power_required(self):
+        """
+        Average power required by the cubesat
+        """
         total_power = (self._adcs_power * constants.Power.duty_cycle + self.avg_power_communication + self._obc_power + self._payload_power + self._thermal_power * (self.eclipse_time/self._time_period))
         return total_power
+    
+    @Attribute
+    def number_of_charging_cycles(self):
+        """
+        Number of battery charging cycles during the mission lifetime.
+        """
+        return self._mission_lifetime_yrs*365.25*(24*3600/self._time_period)  
+    
+    @Attribute
+    def min_state_of_charge(self):
+        """
+        Minimum state of charge of the battery.
+        """
+        return (-162.1584 + 26.7349 * np.log(self.number_of_charging_cycles))*0.01 # logarithmic approximation of the minimum state of charge based on the number of charging cycles
+    
+    @Attribute
+    def req_battery_capacity(self):
+        """
+        Required battery capacity based on power requirements.
+        """
+        bat = self.read_bat_from_csv()
+        req_battery_capacity = self.min_state_of_charge * self.eclipse_time * self.eclipse_power/3600
+        if req_battery_capacity > bat['Capacity'].max():
+            req_battery_capacity = self.min_state_of_charge * self.eclipse_time * self.eclipse_power_without_COM
+        return req_battery_capacity
+
 
     @Attribute
     def battery_selection(self):
@@ -251,19 +331,8 @@ class EPS(ac.Subsystem):
         self.subsystem_type = 'EPS'
         requirement_key = 'Capacity'
         bat = self.read_bat_from_csv()
-        number_of_cycles = self._mission_lifetime_yrs*365.25*(24*3600/self._time_period)
-        print(number_of_cycles)
-        state_of_charge_min =  (-162.1584 + 26.7349 * np.log(number_of_cycles))*0.01 
-        print(state_of_charge_min)
-        req_battery_capacity = state_of_charge_min * self.eclipse_time * self.eclipse_power/3600
-        print(req_battery_capacity)
-
-        if req_battery_capacity > bat['Capacity'].max():
-            req_battery_capacity = state_of_charge_min * self.eclipse_time * self.eclipse_power_without_COM
-            print(req_battery_capacity)
-        selected = self.component_selection(bat, requirement_key, req_battery_capacity, 'greater', subsystem_name='eps')
+        selected = self.component_selection(bat, requirement_key, self.req_battery_capacity, 'greater', subsystem_name='eps')
         self.height = selected['Height']
-        color = Input('orange', widget=ColorPicker)
         return selected
     
     @Attribute
@@ -273,7 +342,7 @@ class EPS(ac.Subsystem):
     
     @Attribute
     def _solar_panel_fluxEOL(self):
-        """Select Solar Panels based on power requirements."""
+        """Solar panel flux at End of Life (EOL)."""
         selected_solar_panel=self.read_SolarPanel_from_csv()
         Flux_solar = selected_solar_panel['Efficiency'] * constants.Thermal.S
         Flux_BOL = Flux_solar * constants.Power.I_d
@@ -283,48 +352,32 @@ class EPS(ac.Subsystem):
     
     @Attribute
     def solar_panel_area(self):
+        """Required solar panel area."""
         area = self.req_solar_panel_power/self._solar_panel_fluxEOL
         return area
     
     @Attribute
     def solar_panel_mass(self):
+        """Estimated mass of solar panels."""
         selected_solar_panel = self.read_SolarPanel_from_csv()
         return (self.req_solar_panel_power/selected_solar_panel['Specific_power'] * 1000)
     
     @Attribute
     def solar_panel_cost(self):
+        """Estimated cost of solar panels."""
         selected_solar_panel = self.read_SolarPanel_from_csv()
         return (self.req_solar_panel_power/selected_solar_panel['Cost'])
         
 
-     
-
 class Thermal(ac.Subsystem):
+    """
+    Thermal Subsystem module for satellite system.
+    This class calculates various parameters related to the thermal management of the satellite.
+    """
     T_max_in_C = Input()  # deg C
     T_min_in_C = Input()  # deg C
     T_margin = Input(5)  # deg C (or K)
     satellite_cp = Input(900)  # J/kgK specific heat capacity of aluminum
-    
-    # @T_max_in_C.validator
-    # def T_max_in_C_validator(self, value):
-    #     if value - self.T_margin < self.T_min_in_C + self.T_margin:
-    #         msg = "Maximum temperature cannot be smaller than minimum temperature, including the margin."
-    #         return False, msg
-    #     return True
-    
-    # @T_min_in_C.validator
-    # def T_min_in_C_validator(self, value):
-    #     if value + self.T_margin > self.T_max_in_C - self.T_margin:
-    #         msg = "Minimum temperature cannot be larger than maximum temperature, including the margin."
-    #         return False, msg
-    #     return True
-    
-    # @T_margin.validator
-    # def T_margin_validator(self, value):
-    #     if value < 0:
-    #         msg = "Margin cannot be negative"
-    #         return False, msg
-    #     return True
     
     @Attribute
     def T_max_with_margin_in_K(self):
@@ -336,21 +389,28 @@ class Thermal(ac.Subsystem):
     
     @Attribute
     def form_factor(self):
-        # return self.parent.structure.form_factor
-        return 2  # TODO get form factor from structure
+        # return form factor 
+        return self.parent.structure.form_factor 
     
     @Attribute
-    def apoapsis(self):
+    def _apoapsis(self):
         return self.parent.orbit.apoapsis
     
     @Attribute
-    def periapsis(self):
+    def _periapsis(self):
         return self.parent.orbit.periapsis
     
     @Attribute
     def satellite_mass(self):
-        # return self.parent.mass
-        return 2  # kg mass of satellite # TODO get mass from satellite
+        
+        pl_mass = self.parent.payload.mass
+        adcs_mass = self.parent.adcs.mass
+        comm_mass = self.parent.communication.mass
+        obc_mass = self.parent.obc.mass
+        eps_mass = self.parent.power.mass
+        structure_mass = self.parent.structure.mass
+        total_mass = pl_mass + adcs_mass + comm_mass + obc_mass + eps_mass + structure_mass  # grams
+        return total_mass /1000 # kg mass of satellite 
     
     @Attribute
     def eclipse_time(self):
@@ -362,18 +422,18 @@ class Thermal(ac.Subsystem):
         
     @Attribute
     def Q_internal(self):
-        # TODO: Get correct heat dissipation values from the components
+        
         ADCS_dissipation = self.parent.adcs.adcs_selection['Power']
         COMM_dissipation = self.parent.communication.comm_selection['Power_Nom']
         OBC_dissipation = self.parent.obc.obc_selection['Power']
-        Payload_dissipation = self.parent.payload.instrument_power_consumption
+        Payload_dissipation = self.parent.payload.power
 
         return ADCS_dissipation + COMM_dissipation + OBC_dissipation + Payload_dissipation
     
     @Attribute
     def selected_coating(self):
 
-        U = np.array([1, 2, 3], dtype=float)  # form factors
+        U = np.array([1, 1.5, 2, 3], dtype=float)  # form factors
 
         # max cross sectional area for all u in U
         A_C_max = np.sqrt(2) * U * 0.01 # m^2
@@ -389,25 +449,25 @@ class Thermal(ac.Subsystem):
         ####### loop coatings
         for i in range(0, len(local_coatings_df)):
             ####### loop form factors
-            for u in range(0, len(U)):
+            for index, u in enumerate(U):
                 T_hot_eq = th.calculate_equilibrium_hot_temp(0, 
                                                             self.Q_internal,
                                                             local_coatings_df.loc[i, 'Absorptivity'], 
                                                             local_coatings_df.loc[i, 'Emissivity'], 
-                                                            self.periapsis, 
-                                                            self.apoapsis, 
-                                                            A_C_max[u], 
+                                                            self._periapsis, 
+                                                            self._apoapsis, 
+                                                            A_C_max[index], 
                                                             A_C_min, 
-                                                            A_S[u])  # K
+                                                            A_S[index])  # K
                 T_cold_eq = th.calculate_equilibrium_cold_temp(0, 
                                                             self.Q_internal,
                                                             local_coatings_df.loc[i, 'Absorptivity'], 
                                                             local_coatings_df.loc[i, 'Emissivity'], 
-                                                            self.periapsis, 
-                                                            self.apoapsis, 
-                                                            A_C_max[u], 
+                                                            self._periapsis, 
+                                                            self._apoapsis, 
+                                                            A_C_max[index], 
                                                             A_C_min, 
-                                                            A_S[u])  # K
+                                                            A_S[index])  # K
 
                 # final temperatures for design
                 T_hot = T_hot_eq
@@ -417,18 +477,18 @@ class Thermal(ac.Subsystem):
                                                              self.satellite_mass, 
                                                              self.satellite_cp, 
                                                              local_coatings_df.loc[i, 'Emissivity'], 
-                                                             A_S[u], 
+                                                             A_S[index], 
                                                              self.eclipse_time)  # K
 
-                local_coatings_df.loc[i, f'Hot Case {u+1}U'] = T_hot  # K
-                local_coatings_df.loc[i, f'Cold Case {u+1}U'] = T_cold  # K
-                local_coatings_df.loc[i, f'Hot Margin {u+1}U'] = self.T_max_with_margin_in_K - T_hot  # K
-                local_coatings_df.loc[i, f'Cold Margin {u+1}U'] = T_cold - self.T_min_with_margin_in_K  # K
+                local_coatings_df.loc[i, f'Hot Case {u}U'] = T_hot  # K
+                local_coatings_df.loc[i, f'Cold Case {u}U'] = T_cold  # K
+                local_coatings_df.loc[i, f'Hot Margin {u}U'] = self.T_max_with_margin_in_K - T_hot  # K
+                local_coatings_df.loc[i, f'Cold Margin {u}U'] = T_cold - self.T_min_with_margin_in_K  # K
 
         # print coatings_df only the margins
-        print(local_coatings_df[['Coating' , 'Hot Margin 1U', 'Cold Margin 1U','Hot Margin 2U', 'Cold Margin 2U', 'Hot Margin 3U',  'Cold Margin 3U']])
-        
-        selected_coating = th.select_coating(self.form_factor, local_coatings_df)
+        print(local_coatings_df[['Coating' , 'Hot Margin 1.0U', 'Cold Margin 1.0U', 'Hot Margin 1.5U', 'Cold Margin 1.5U', 'Hot Margin 2.0U', 'Cold Margin 2.0U', 'Hot Margin 3.0U',  'Cold Margin 3.0U']])
+        print(float(self.form_factor))
+        selected_coating = th.select_coating(float(self.form_factor), local_coatings_df)
         return selected_coating
 
     @Attribute
@@ -460,8 +520,8 @@ class Thermal(ac.Subsystem):
                                                         self.Q_internal,
                                                         self.selected_coating['Absorptivity'], 
                                                         self.selected_coating['Emissivity'], 
-                                                        self.periapsis, 
-                                                        self.apoapsis, 
+                                                        self._periapsis, 
+                                                        self._apoapsis, 
                                                         A_C_max, 
                                                         A_C_min, 
                                                         A_S)  # K
@@ -469,13 +529,13 @@ class Thermal(ac.Subsystem):
                                                         self.Q_internal,
                                                         self.selected_coating['Absorptivity'], 
                                                         self.selected_coating['Emissivity'], 
-                                                        self.periapsis, 
-                                                        self.apoapsis, 
+                                                        self._periapsis, 
+                                                        self._apoapsis, 
                                                         A_C_max, 
                                                         A_C_min, 
                                                         A_S)  # K
             T_hot = T_hot_eq
-            # print(f"for test {T_cold_eq} < {T_hot}")
+            print(f"for test {T_cold_eq} < {T_hot}")
             T = th.exact_transient_solution_cooling(T_cold_eq, 
                                                     T_hot, 
                                                     self.satellite_mass, 

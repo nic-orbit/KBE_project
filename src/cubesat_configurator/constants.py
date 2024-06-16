@@ -32,7 +32,7 @@ class SystemConfig:
 
 
 class GenericConfig:
-    relative_step_file_path = os.path.join(script_dir, 'step_files', 'step_file.step')
+    relative_step_file_path = os.path.join(script_dir, 'step_files', 'cubesat_configuration.step')
     step_file_location = os.path.join(script_dir, relative_step_file_path)
 
 class Power:
