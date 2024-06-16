@@ -40,6 +40,7 @@ class Payload(ac.Subsystem):
     instrument_pixel_resolution=Input() # range to be defined or we split this into w and h, consider list
     instrument_bit_depth=Input() #range to be defined (1-24) Check gs for inputvalidator
     
+    mass = Input(instrument_mass)
     height = Input(instrument_height)
     cost=Input(instrument_cost)
     subsystem_type = 'Payload' 
@@ -183,6 +184,7 @@ class OBC(ac.Subsystem):
     
 
 class EPS(ac.Subsystem):
+    color = Input('Aqua', widget=ColorPicker)
     
     Solar_cell_type = Input(default='Triple Junction GaAs rigid', widget=Dropdown(['Si rigid panel', 'HES Flexible array','Triple Junction GaAs rigid', 'Triple Junction GaAs ultraflex']))
     

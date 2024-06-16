@@ -19,9 +19,9 @@ from cubesat_configurator.structure import Structure
 
 
 class CubeSat(GeomBase):
-    cost_factor = Input(0, validator=Range(0, 1))
-    mass_factor = Input(0, validator=Range(0, 1))
-    power_factor = Input(0, validator=Range(0, 1))
+    cost_factor = Input(0.3, validator=Range(0, 1))
+    mass_factor = Input(0.4, validator=Range(0, 1))
+    power_factor = Input(0.3, validator=Range(0, 1))
 
     
 
@@ -650,4 +650,5 @@ class CubeSat(GeomBase):
         Returns an instance of the Thermal class.
         """
         return subsys.Thermal(T_max_in_C=50, 
-                              T_min_in_C=-5)
+                              T_min_in_C=-5,
+                              _has_geometry=False)

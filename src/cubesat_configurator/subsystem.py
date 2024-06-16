@@ -6,16 +6,17 @@ import os
 import pandas as pd
 
 class Subsystem(GeomBase):
-    height = Input(10)
-    mass = Input(0.01)
-    power = Input(0.01)
-    cost = Input(0.01) #implement specific range for mass, power, cost (rating on 3?)
-    subsytem_name = Input(None)
+    height = Input(0)
+    mass = Input(0)
+    power = Input(0)
+    cost = Input(0) #implement specific range for mass, power, cost (rating on 3?)
+    # subsytem_name = Input(None)
+    _has_geometry = Input(True)
     
 
-    # we force width and length to be always equal to 100 mm to adhere to CubeSat form factor!
-    width = 100
-    length = 100
+    # we force width and length to be always equal to 96 mm to adhere to CubeSat form factor!
+    width = 94
+    length = 94
 
     def read_subsystems_from_csv(self, subsystem_file_name):
         """Read subsystem data from CSV."""
@@ -111,18 +112,31 @@ class Subsystem(GeomBase):
         selected = min(filtered_list, key=lambda x: x['Score'])
         self.mass = selected["Mass"]
         self.cost = selected["Cost"]
+        self.height = selected["Height"]
         if is_comm and tgs is not None: 
             self.power = selected['Power_DL'] * (tgs / (24*3600)) + selected['Power_Nom'] * (1 - (tgs / (24*3600)))
         else:
             self.power = selected["Power"]
         return selected
  
-    @Attribute
-    def CoM(self):
-        return Point(x=0.5*self.width, y=0.5*self.length, z=0.5*self.height)
+    @Attribute(settable=True)
+    def CoM_location(self):
+        if not self._has_geometry:
+            return 0
+        my_name = self.__class__.__name__
+        print(my_name)
+        # find the center of mass of this subsystem (with my_name as the name of the subsystem in the list)
+        optimal_stacking_order = self.parent.structure.optimal_stacking_order
+        # find the CoM location of the subsystem
+        for i, subsystem in enumerate(optimal_stacking_order):
+            print(subsystem['name'])
+            if subsystem['name'] == my_name:
+                CoM_z = subsystem['CoM_Location']
+        print(CoM_z)
+        return CoM_z
     
     @Part
-    def bounding_box(self):
+    def representation(self):
         """
         Example of dynamic type chosen from type_dict, based on user input dyn_input_key
         :return: DynamicType
@@ -132,7 +146,11 @@ class Subsystem(GeomBase):
         return Box(length=self.length, 
                    width=self.width, 
                    height=self.height,
-                   tooltip=self.subsystem_type)
+                   tooltip=self.subsystem_type,
+                   position=translate(self.position, 
+                                      'z', self.CoM_location),
+                   centered=True,
+                   suppress=(not self._has_geometry),)
     
 
 if __name__ == "__main__":
