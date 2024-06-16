@@ -32,7 +32,7 @@ class CubeSat(GeomBase):
         """
         mass = 0
         for child in self.children:
-            if isinstance(child, ac.Subsystem) and hasattr(child, "mass"):
+            if isinstance(child, (ac.Subsystem, Structure)) and hasattr(child, "mass"):
                 mass += child.mass
         return mass*(1 + constants.SystemConfig.system_margin) # kg
 
@@ -43,9 +43,20 @@ class CubeSat(GeomBase):
         """
         power = 0
         for child in self.children:
-            if isinstance(child, ac.Subsystem) and hasattr(child, "power") and child.power is not None:
+            if isinstance(child, (ac.Subsystem)) and hasattr(child, "power") and child.power is not None: # no need to include Structure in power calculation
                 power += child.power
         return power*(1 + constants.SystemConfig.system_margin) # W
+    
+    @Attribute
+    def total_cost(self):
+        """
+        Calculate the total cost of the CubeSat based on the cost of the subsystems (bottom-up approach) for final reporting. 
+        """
+        cost = 0
+        for child in self.children:
+            if isinstance(child, (ac.Subsystem, Structure)) and hasattr(child, "cost") and child.cost is not None:
+                cost += child.cost
+        return cost # USD ( no margin for cost! )
 
     @Attribute
     def system_data_rate(self):
@@ -70,34 +81,6 @@ class CubeSat(GeomBase):
         Returns an instance of the Orbit class with the maximum allowed orbital altitude from the mission as input.
         """
         return Orbit(altitude=self.parent.max_orbit_altitude)
-    
-    #to be deleted! - Try to implement separately for each subsystem
-    # @Attribute
-    # def subsystem_dict(self):
-    #     # Get the current directory of the script
-    #     script_dir = os.path.dirname(__file__)
-    #     relative_path = os.path.join('..', 'Subsystem_Library')
-
-    #     # Construct the full relative file path to subsystems library
-    #     file_path_trunk = os.path.join(script_dir, relative_path)
-
-    #     subsystems = {"OBC": "OBC.yaml", "EPS": "EPS.yaml", "COMM": "COMM.yaml"}
-
-    #     for key, value in subsystems.items():
-    #         file_path = os.path.join(file_path_trunk, value)
-
-    #         # Check if the file exists
-    #         if not os.path.exists(file_path):
-    #             raise FileNotFoundError(f"The file '{file_path}' does not exist.")
-
-    #         with open(file_path) as f:
-    #             try:
-    #                 subsystems[key] = yaml.safe_load(f)
-    #             except yaml.YAMLError as exc:
-    #                 print(exc)
-
-    #     pprint(subsystems)
-    #     return subsystems
     
     
     @Attribute
@@ -291,7 +274,7 @@ class CubeSat(GeomBase):
         Im_width = self.payload.instrument_pixel_resolution[0]
         Im_height = self.payload.instrument_pixel_resolution[1]
         Im_bit_depth = self.payload.instrument_bit_depth
-        images_per_day = self.payload.instrument_images_per_day
+        images_per_day = self.payload._instrument_images_per_day
         time_btw_pics = pk.DAY2SEC/images_per_day # in seconds
 
         # Communication parameters
@@ -596,15 +579,10 @@ class CubeSat(GeomBase):
                               instrument_max_operating_temp=50, # deg C
                               instrument_focal_length=40, # mm
                               instrument_pixel_size=7,  # µm - Typical values for industrial cameras range from 1.5 to 15 µm ( bigger --> better SNR, but larger (worse) GSD )
-                              instrument_power_consumption=10, # W
-                              power = 10, # W
-                              instrument_mass=0.5, # kg
-                              mass = 0.5, # kg
-                              instrument_height=50, # mm
+                              power = 1, # W
+                              mass = 500, # g
                               height=50, # mm
-                              instrument_width=100, # mm
-                              instrument_length=100, # mm
-                              instrument_cost=10000, # USD
+                              cost=10000, # USD
                               instrument_pixel_resolution = [1260, 1260], # pixels
                               instrument_bit_depth=8 #range to be defined (1-24) Check gs for inputvalidator
                               )

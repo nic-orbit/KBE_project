@@ -1,11 +1,7 @@
 from parapy.core import *
 from parapy.geom import *
 from parapy.exchange.step import STEPReader
-from parapy.exchange import STLReader
-from parapy.core.validate import OneOf, LessThan, GreaterThan, GreaterThanOrEqualTo, IsInstance
-from parapy.core.widgets import (
-    Button, CheckBox, ColorPicker, Dropdown, FilePicker, MultiCheckBox,
-    ObjectPicker, SingleSelection, TextField)
+
 import pandas as pd
 import numpy as np
 import os
@@ -41,7 +37,7 @@ class Structure(GeomBase):
         adcs_selection_list = self.parent.adcs.adcs_selection
         bat_selection_list = self.parent.power.battery_selection
         comm_selection_list = self.parent.communication.comm_selection
-        total_height = obc_selection_list['Height'] + adcs_selection_list['Height'] + self.parent.payload.instrument_height + bat_selection_list['Height'] + comm_selection_list['Height']
+        total_height = obc_selection_list['Height'] + adcs_selection_list['Height'] + self.parent.payload.height + bat_selection_list['Height'] + comm_selection_list['Height']
         height_factor = total_height / 100
         
         if height_factor < 1:
@@ -105,12 +101,18 @@ class Structure(GeomBase):
             raise ValueError("No suitable component found based on the criteria.") 
         
         selected_structure = struct_selection[0]
-        self.mass = selected_structure['Mass']
-        self.cost = selected_structure['Cost']
         
         return selected_structure
     
-        
+
+    @Attribute
+    def mass(self):
+        return self.structure['Mass']
+    
+    @Attribute
+    def cost(self):
+        return self.structure['Cost']
+
     @Attribute
     def subsystem_data_for_stacking(self):
         """
@@ -151,6 +153,25 @@ class Structure(GeomBase):
         
         optimal_stack = self._find_optimal_stacking_order(self.subsystem_data_for_stacking, fixed_at_bottom)
         return optimal_stack
+    
+    @Attribute
+    def CoM_location(self):
+        """
+        Returns the center of mass of the satellite stack.
+        """
+        optimal_stack = self.optimal_stacking_order
+        CoM = self.calculate_CoM_of_stack(optimal_stack)
+        return CoM
+    
+    @Attribute
+    def distance_CoM_to_geometric_center(self):
+        """
+        Returns the distance between the center of mass and the geometric center of the satellite stack.
+        """
+        total_height = 100*self.form_factor
+        geometric_center = total_height / 2
+        distance = abs(self.CoM_location - geometric_center)
+        return distance
 
     
     def _find_optimal_stacking_order(self, subsystems, fixed_at_bottom=None):

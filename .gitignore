@@ -4,6 +4,8 @@
 *.ipynb
 *.ipynb_checkpoints
 *.mp4
+*.FCStd
+*.FCBak
 #folders
 __pycache__
 experiments

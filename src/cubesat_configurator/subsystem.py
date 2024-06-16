@@ -1,7 +1,5 @@
 from parapy.core import *
 from parapy.geom import *
-from parapy.core.validate import OneOf, LessThan, GreaterThan, GreaterThanOrEqualTo
-from parapy.core.widgets import ColorPicker, CheckBox, FilePicker, Dropdown
 import os
 import pandas as pd
 
@@ -10,10 +8,8 @@ class Subsystem(GeomBase):
     mass = Input(0)
     power = Input(0)
     cost = Input(0) #implement specific range for mass, power, cost (rating on 3?)
-    # subsytem_name = Input(None)
     _has_geometry = Input(True)
     
-
     # we force width and length to be always equal to 96 mm to adhere to CubeSat form factor!
     width = 94
     length = 94
@@ -25,7 +21,7 @@ class Subsystem(GeomBase):
         obc_info_path = os.path.join(script_dir, relative_path)
         return pd.read_csv(obc_info_path)
 
-    def component_selection(self,component, filter_key, filter_value, comparator='greater',is_comm=False, tgs=None, subsystem_name='eps'):
+    def component_selection(self,component, filter_key, filter_value, comparator='greater',is_comm=False, tgs=None, subsystem_name='subsystem'):
         """
         Filter components and select the best component based on the score.
         """
@@ -122,14 +118,14 @@ class Subsystem(GeomBase):
     @Attribute(settable=True)
     def CoM_location(self):
         if not self._has_geometry:
-            return 0
+            return None
         my_name = self.__class__.__name__
         print(my_name)
         # find the center of mass of this subsystem (with my_name as the name of the subsystem in the list)
         optimal_stacking_order = self.parent.structure.optimal_stacking_order
         # find the CoM location of the subsystem
         for i, subsystem in enumerate(optimal_stacking_order):
-            print(subsystem['name'])
+            # print(subsystem['name'])
             if subsystem['name'] == my_name:
                 CoM_z = subsystem['CoM_Location']
         print(CoM_z)

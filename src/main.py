@@ -1,5 +1,4 @@
 from parapy.gui import display
-from parapy.core.widgets import ColorPicker, CheckBox, FilePicker, Dropdown
 
 from cubesat_configurator.mission import Mission
 from pprint import pprint
@@ -7,7 +6,7 @@ from pprint import pprint
 
 def paseos_test():
     my_mission = Mission(mission_lifetime=24, # months
-                            orbit_type="SSO", widget=Dropdown(["SSO", "Polar", "Equatorial", "custom"]), # SSO, Polar, Equatorial, custom
+                            orbit_type="SSO",
                             custom_inclination=30, # deg
                             number_of_images_per_day=10, # number
                             reqiured_GSD=50, # m

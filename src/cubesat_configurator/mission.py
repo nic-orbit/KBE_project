@@ -1,7 +1,11 @@
 from parapy.core import *
 from parapy.geom import *
-from parapy.core.validate import OneOf, LessThan, GreaterThan, GreaterThanOrEqualTo, IsInstance
+from parapy.core.validate import GreaterThan, IsInstance
+from parapy.core.widgets import Dropdown, CheckBox
+from parapy.exchange.step import STEPWriter
+
 from cubesat_configurator import paseos_parser as pp
+from cubesat_configurator import constants
 from cubesat_configurator.cubesat import CubeSat
 from cubesat_configurator.groundstation import GroundStation
 
@@ -32,12 +36,26 @@ class Mission(GeomBase):
     mission_lifetime = Input(doc="Mission Lifetime in months") # months
     reqiured_GSD = Input() # m
     number_of_images_per_day = Input() # number
-    orbit_type = Input() # SSO, Polar, Equatorial, custom
+    orbit_type = Input('SSO', widget=Dropdown(["SSO", "Polar", "Equatorial", "custom"])) # SSO, Polar, Equatorial, custom) # SSO, Polar, Equatorial, custom
     custom_inclination = Input(0) # deg 
     # Ground Stations selection
     ground_station_selection = Input(validator=IsInstance(list))
     #system requirements
     req_pointing_accuracy = Input(validator=GreaterThan(0)) # deg
+
+    @action(label="Generate STEP",
+            button_label="Click to generate STEP file.")
+    def call_me(self):
+        print("STEP file will be generated for the current configuration: \n")
+        # need to calculate total mass before generating STEP file, otherwise the mass of subsystems will be 0!
+        print("Calculating total mass...")
+        print(f'total mass: {self.cubesat.total_mass}')
+        structure = self.cubesat.structure
+        structure.subsystem_data_for_stacking
+        structure._display_stacking(structure.optimal_stacking_order, structure.form_factor*100)
+        print("Generating STEP file...")
+        writer = STEPWriter(trees=[self.cubesat], filename = constants.GenericConfig.step_file_location)
+        writer.write()
 
 
     # Not moved to Orbit class becasuse we want to instanciate the Orbit class with altitude as an input

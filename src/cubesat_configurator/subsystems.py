@@ -26,13 +26,13 @@ class Payload(ac.Subsystem):
     # instrument_data_rate = Input() # kbps
     instrument_focal_length = Input() # mm
     instrument_pixel_size = Input() # µm
-    instrument_power_consumption = Input() # W
-    instrument_mass = Input() # kg
-    instrument_cost = Input() # USD
-    ### maybe we can delete these and use just height, width and length?
-    instrument_height = Input() # mm
-    instrument_width = Input() # mm
-    instrument_length = Input() # mm
+    # instrument_power_consumption = Input() # W
+    # instrument_mass = Input() # kg
+    # instrument_cost = Input() # USD
+    # ### maybe we can delete these and use just height, width and length?
+    # instrument_height = Input() # mm
+    # instrument_width = Input() # mm
+    # instrument_length = Input() # mm
     ### maybe we can delete these and use just height, width and length?
     # I feel like images per day should be on mission level?
     # instrument_image_width=Input()
@@ -40,15 +40,15 @@ class Payload(ac.Subsystem):
     instrument_pixel_resolution=Input() # range to be defined or we split this into w and h, consider list
     instrument_bit_depth=Input() #range to be defined (1-24) Check gs for inputvalidator
     
-    mass = Input(instrument_mass)
-    height = Input(instrument_height)
-    cost=Input(instrument_cost)
+    # mass = Input()
+    # height = Input()
+    # cost=Input()
     subsystem_type = 'Payload' 
     # Thought it would be nice to check if the sensor fits within the limits of the satellite
     # I saw in extreme cases (15 µm & 4k resolution) it can be almost 60 mm long on the long side. 
 
     @Attribute
-    def instrument_images_per_day(self):
+    def _instrument_images_per_day(self):
         return self.parent.parent.number_of_images_per_day
 
     @Attribute
@@ -81,7 +81,7 @@ class Payload(ac.Subsystem):
         Payload data rate calculation based on the instrument characteristics.
         PLDR = (Number_of_pixels * Bit_depth [bits] * Number_of_images_per_day) / seconds per day * 1E-3 [kbps]
         """
-        instrument_data_per_day = self.image_size*self.instrument_images_per_day # kbits
+        instrument_data_per_day = self.image_size*self._instrument_images_per_day # kbits
         return ( instrument_data_per_day ) / ( pk.DAY2SEC ) # kbps
     
 #All good 
@@ -224,7 +224,7 @@ class EPS(ac.Subsystem):
     
     @Attribute
     def _payload_power(self):
-        return self.parent.payload.instrument_power_consumption
+        return self.parent.payload.power
     
     @Attribute
     def avg_power_communication(self):
@@ -244,6 +244,23 @@ class EPS(ac.Subsystem):
     def average_power_required(self):
         total_power = (self._adcs_power * constants.Power.duty_cycle + self.avg_power_communication + self._obc_power + self._payload_power + self._thermal_power * (self.eclipse_time/self._time_period))
         return total_power
+    
+    @Attribute
+    def number_of_charging_cycles(self):
+        return self._mission_lifetime_yrs*365.25*(24*3600/self._time_period)  
+    
+    @Attribute
+    def min_state_of_charge(self):
+        return (-162.1584 + 26.7349 * np.log(self.number_of_charging_cycles))*0.01 # logarithmic approximation of the minimum state of charge based on the number of charging cycles
+    
+    @Attribute
+    def req_battery_capacity(self):
+        bat = self.read_bat_from_csv()
+        req_battery_capacity = self.min_state_of_charge * self.eclipse_time * self.eclipse_power/3600
+        if req_battery_capacity > bat['Capacity'].max():
+            req_battery_capacity = self.min_state_of_charge * self.eclipse_time * self.eclipse_power_without_COM
+        return req_battery_capacity
+
 
     @Attribute
     def battery_selection(self):
@@ -251,19 +268,8 @@ class EPS(ac.Subsystem):
         self.subsystem_type = 'EPS'
         requirement_key = 'Capacity'
         bat = self.read_bat_from_csv()
-        number_of_cycles = self._mission_lifetime_yrs*365.25*(24*3600/self._time_period)
-        print(number_of_cycles)
-        state_of_charge_min =  (-162.1584 + 26.7349 * np.log(number_of_cycles))*0.01 
-        print(state_of_charge_min)
-        req_battery_capacity = state_of_charge_min * self.eclipse_time * self.eclipse_power/3600
-        print(req_battery_capacity)
-
-        if req_battery_capacity > bat['Capacity'].max():
-            req_battery_capacity = state_of_charge_min * self.eclipse_time * self.eclipse_power_without_COM
-            print(req_battery_capacity)
-        selected = self.component_selection(bat, requirement_key, req_battery_capacity, 'greater', subsystem_name='eps')
+        selected = self.component_selection(bat, requirement_key, self.req_battery_capacity, 'greater', subsystem_name='eps')
         self.height = selected['Height']
-        color = Input('orange', widget=ColorPicker)
         return selected
     
     @Attribute
@@ -305,27 +311,6 @@ class Thermal(ac.Subsystem):
     T_margin = Input(5)  # deg C (or K)
     satellite_cp = Input(900)  # J/kgK specific heat capacity of aluminum
     
-    # @T_max_in_C.validator
-    # def T_max_in_C_validator(self, value):
-    #     if value - self.T_margin < self.T_min_in_C + self.T_margin:
-    #         msg = "Maximum temperature cannot be smaller than minimum temperature, including the margin."
-    #         return False, msg
-    #     return True
-    
-    # @T_min_in_C.validator
-    # def T_min_in_C_validator(self, value):
-    #     if value + self.T_margin > self.T_max_in_C - self.T_margin:
-    #         msg = "Minimum temperature cannot be larger than maximum temperature, including the margin."
-    #         return False, msg
-    #     return True
-    
-    # @T_margin.validator
-    # def T_margin_validator(self, value):
-    #     if value < 0:
-    #         msg = "Margin cannot be negative"
-    #         return False, msg
-    #     return True
-    
     @Attribute
     def T_max_with_margin_in_K(self):
         return self.T_max_in_C + 273.15 - self.T_margin # K
@@ -337,20 +322,27 @@ class Thermal(ac.Subsystem):
     @Attribute
     def form_factor(self):
         # return self.parent.structure.form_factor
-        return 2  # TODO get form factor from structure
+        return self.parent.structure.form_factor 
     
     @Attribute
-    def apoapsis(self):
+    def _apoapsis(self):
         return self.parent.orbit.apoapsis
     
     @Attribute
-    def periapsis(self):
+    def _periapsis(self):
         return self.parent.orbit.periapsis
     
     @Attribute
     def satellite_mass(self):
-        # return self.parent.mass
-        return 2  # kg mass of satellite # TODO get mass from satellite
+        
+        pl_mass = self.parent.payload.mass
+        adcs_mass = self.parent.adcs.mass
+        comm_mass = self.parent.communication.mass
+        obc_mass = self.parent.obc.mass
+        eps_mass = self.parent.power.mass
+        structure_mass = self.parent.structure.mass
+        total_mass = pl_mass + adcs_mass + comm_mass + obc_mass + eps_mass + structure_mass  # grams
+        return total_mass /1000 # kg mass of satellite 
     
     @Attribute
     def eclipse_time(self):
@@ -362,18 +354,18 @@ class Thermal(ac.Subsystem):
         
     @Attribute
     def Q_internal(self):
-        # TODO: Get correct heat dissipation values from the components
+        
         ADCS_dissipation = self.parent.adcs.adcs_selection['Power']
         COMM_dissipation = self.parent.communication.comm_selection['Power_Nom']
         OBC_dissipation = self.parent.obc.obc_selection['Power']
-        Payload_dissipation = self.parent.payload.instrument_power_consumption
+        Payload_dissipation = self.parent.payload.power
 
         return ADCS_dissipation + COMM_dissipation + OBC_dissipation + Payload_dissipation
     
     @Attribute
     def selected_coating(self):
 
-        U = np.array([1, 2, 3], dtype=float)  # form factors
+        U = np.array([1, 1.5, 2, 3], dtype=float)  # form factors
 
         # max cross sectional area for all u in U
         A_C_max = np.sqrt(2) * U * 0.01 # m^2
@@ -389,25 +381,25 @@ class Thermal(ac.Subsystem):
         ####### loop coatings
         for i in range(0, len(local_coatings_df)):
             ####### loop form factors
-            for u in range(0, len(U)):
+            for index, u in enumerate(U):
                 T_hot_eq = th.calculate_equilibrium_hot_temp(0, 
                                                             self.Q_internal,
                                                             local_coatings_df.loc[i, 'Absorptivity'], 
                                                             local_coatings_df.loc[i, 'Emissivity'], 
-                                                            self.periapsis, 
-                                                            self.apoapsis, 
-                                                            A_C_max[u], 
+                                                            self._periapsis, 
+                                                            self._apoapsis, 
+                                                            A_C_max[index], 
                                                             A_C_min, 
-                                                            A_S[u])  # K
+                                                            A_S[index])  # K
                 T_cold_eq = th.calculate_equilibrium_cold_temp(0, 
                                                             self.Q_internal,
                                                             local_coatings_df.loc[i, 'Absorptivity'], 
                                                             local_coatings_df.loc[i, 'Emissivity'], 
-                                                            self.periapsis, 
-                                                            self.apoapsis, 
-                                                            A_C_max[u], 
+                                                            self._periapsis, 
+                                                            self._apoapsis, 
+                                                            A_C_max[index], 
                                                             A_C_min, 
-                                                            A_S[u])  # K
+                                                            A_S[index])  # K
 
                 # final temperatures for design
                 T_hot = T_hot_eq
@@ -417,18 +409,18 @@ class Thermal(ac.Subsystem):
                                                              self.satellite_mass, 
                                                              self.satellite_cp, 
                                                              local_coatings_df.loc[i, 'Emissivity'], 
-                                                             A_S[u], 
+                                                             A_S[index], 
                                                              self.eclipse_time)  # K
 
-                local_coatings_df.loc[i, f'Hot Case {u+1}U'] = T_hot  # K
-                local_coatings_df.loc[i, f'Cold Case {u+1}U'] = T_cold  # K
-                local_coatings_df.loc[i, f'Hot Margin {u+1}U'] = self.T_max_with_margin_in_K - T_hot  # K
-                local_coatings_df.loc[i, f'Cold Margin {u+1}U'] = T_cold - self.T_min_with_margin_in_K  # K
+                local_coatings_df.loc[i, f'Hot Case {u}U'] = T_hot  # K
+                local_coatings_df.loc[i, f'Cold Case {u}U'] = T_cold  # K
+                local_coatings_df.loc[i, f'Hot Margin {u}U'] = self.T_max_with_margin_in_K - T_hot  # K
+                local_coatings_df.loc[i, f'Cold Margin {u}U'] = T_cold - self.T_min_with_margin_in_K  # K
 
         # print coatings_df only the margins
-        print(local_coatings_df[['Coating' , 'Hot Margin 1U', 'Cold Margin 1U','Hot Margin 2U', 'Cold Margin 2U', 'Hot Margin 3U',  'Cold Margin 3U']])
-        
-        selected_coating = th.select_coating(self.form_factor, local_coatings_df)
+        print(local_coatings_df[['Coating' , 'Hot Margin 1.0U', 'Cold Margin 1.0U', 'Hot Margin 1.5U', 'Cold Margin 1.5U', 'Hot Margin 2.0U', 'Cold Margin 2.0U', 'Hot Margin 3.0U',  'Cold Margin 3.0U']])
+        print(float(self.form_factor))
+        selected_coating = th.select_coating(float(self.form_factor), local_coatings_df)
         return selected_coating
 
     @Attribute
@@ -460,8 +452,8 @@ class Thermal(ac.Subsystem):
                                                         self.Q_internal,
                                                         self.selected_coating['Absorptivity'], 
                                                         self.selected_coating['Emissivity'], 
-                                                        self.periapsis, 
-                                                        self.apoapsis, 
+                                                        self._periapsis, 
+                                                        self._apoapsis, 
                                                         A_C_max, 
                                                         A_C_min, 
                                                         A_S)  # K
@@ -469,13 +461,13 @@ class Thermal(ac.Subsystem):
                                                         self.Q_internal,
                                                         self.selected_coating['Absorptivity'], 
                                                         self.selected_coating['Emissivity'], 
-                                                        self.periapsis, 
-                                                        self.apoapsis, 
+                                                        self._periapsis, 
+                                                        self._apoapsis, 
                                                         A_C_max, 
                                                         A_C_min, 
                                                         A_S)  # K
             T_hot = T_hot_eq
-            # print(f"for test {T_cold_eq} < {T_hot}")
+            print(f"for test {T_cold_eq} < {T_hot}")
             T = th.exact_transient_solution_cooling(T_cold_eq, 
                                                     T_hot, 
                                                     self.satellite_mass, 
