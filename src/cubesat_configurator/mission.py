@@ -175,7 +175,7 @@ class Mission(GeomBase):
             # Communication 
             "<req_dl>" : self.cubesat.min_downlink_data_rate,
             # OBC
-            "<req_store>": self.cubesat.obc.required_onboard_data_storage*1000,
+            "<req_store>": self.cubesat.obc.required_onboard_data_storage,
             # ADCS
             "<req_pa>": self.cubesat.adcs.required_pointing_accuracy,
             # Power
