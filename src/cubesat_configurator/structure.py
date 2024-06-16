@@ -122,6 +122,9 @@ class Structure(GeomBase):
 
         subsystems = []
 
+        # evaluate the subsystems masses
+        print(f'total system mass: f{self.parent.total_mass}')
+
         payload = self.parent.payload
         adcs = self.parent.adcs
         power = self.parent.power

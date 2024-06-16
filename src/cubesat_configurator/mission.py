@@ -45,7 +45,7 @@ class Mission(GeomBase):
 
     @action(label="Generate STEP",
             button_label="Click to generate STEP file.")
-    def call_me(self):
+    def generate_step(self):
         print("STEP file will be generated for the current configuration: \n")
         # need to calculate total mass before generating STEP file, otherwise the mass of subsystems will be 0!
         print("Calculating total mass...")

@@ -1,4 +1,4 @@
-index,Company,Data_Rate,Power_Nom,Power_DL,Mass,Height,Cost,Min_Temp, Max_Temp
+index,Company,Data_Rate,Power_Nom,Power_DL,Mass,Height,Cost,Min_Temp,Max_Temp
 1,Isispace,9.6,0.48,4,75,15,3200,-20, 60
 2,Endurosat,19.2,0.1,1,94,10,5000,-40,80
 3,Murgas,38.4,0.132,5,25,7,6000,-40,85

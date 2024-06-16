@@ -494,6 +494,30 @@ class CubeSat(GeomBase):
         return self.simulate_second_orbit["maximum_onboard_data"]*(1 + constants.SystemConfig.system_margin)
     
     @Attribute
+    def system_max_allowed_temperature(self):
+        """
+        Calculate the maximum allowed temperature of the CubeSat based on the maximum allowed temperature of the subsystems.
+        """
+        pl_max_temp = self.payload.instrument_max_operating_temp
+        comm_max_temp = self.communication.comm_selection['Max_Temp']
+        power_max_temp = self.power.battery_selection['Max_Temp']
+        obc_max_temp = self.obc.obc_selection['Max_Temp']
+
+        return min(pl_max_temp, comm_max_temp, power_max_temp, obc_max_temp)  # deg C
+    
+    @Attribute
+    def system_min_allowed_temperature(self):
+        """
+        Calculate the minimum allowed temperature of the CubeSat based on the minimum allowed temperature of the subsystems.
+        """
+        pl_min_temp = self.payload.instrument_min_operating_temp
+        comm_min_temp = self.communication.comm_selection['Min_Temp']
+        power_min_temp = self.power.battery_selection['Min_Temp']
+        obc_min_temp = self.obc.obc_selection['Min_Temp']
+
+        return max(pl_min_temp, comm_min_temp, power_min_temp, obc_min_temp)  # deg C
+
+    @Attribute
     def plot_simulation_data(self):
         """
         Plot the simulation data for the first orbit.
@@ -627,6 +651,6 @@ class CubeSat(GeomBase):
         """
         Returns an instance of the Thermal class.
         """
-        return subsys.Thermal(T_max_in_C=50, 
-                              T_min_in_C=-5,
+        return subsys.Thermal(T_max_in_C=self.system_max_allowed_temperature, 
+                              T_min_in_C=self.system_min_allowed_temperature,
                               _has_geometry=False)

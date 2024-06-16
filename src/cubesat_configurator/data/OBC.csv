@@ -1,4 +1,4 @@
-index,Company,Storage,Power,Mass,Height,Cost,Min_Temp, Max_Temp
+index,Company,Storage,Power,Mass,Height,Cost,Min_Temp,Max_Temp
 1,IMT,8,0.3,38,10,7200,-20,70
 2,Deep Thought,0.128,0.1,25,10,6500,-40,85
 3,NST,2,0.43,60,20,8000,-40,85
