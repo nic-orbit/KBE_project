@@ -1,5 +1,5 @@
-index,Type,Specific_power,Efficiency,Cost,Area_per_power
-1,Si rigid panel,58.5,0.19,1000,0.00445
-2,HES Flexible array,114,0.19,1500,0.00512
-3,Triple Junction GaAs rigid,70,0.268,1000,0.00312
-4,Triple Junction GaAs ultraflex,115,0.268,1500,0.00362
+index,Type,Specific_power,Efficiency,Cost,Area_per_power,Specific_cost
+1,SI rigid panel,58.5,0.19,1000,0.00445,1
+2,HES Flexible array,114,0.19,1500,0.00512,1.5
+3,Triple Junction GaAs rigid,70,0.268,1000,0.00312,0.75
+4,Triple Junction GaAs ultraflex,115,0.268,1500,0.00362,1.75

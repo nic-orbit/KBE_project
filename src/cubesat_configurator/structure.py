@@ -137,6 +137,9 @@ class Structure(GeomBase):
             sub_data = {'name': sub.__class__.__name__, 'mass': sub.mass, 'height': sub.height, 'CoM_Location': None}
             subsystems.append(sub_data)
 
+        # set EPS power to battery power
+        subsystems[2]['mass'] = self.parent.power.battery_selection['Mass']
+
         # # for testing purposes
         # payload = {'name': 'Payload', 'mass': 300, 'height': 70, 'CoM_Location': None}
         # adcs = {'name': 'ADCS', 'mass': 500, 'height': 60, 'CoM_Location': None}

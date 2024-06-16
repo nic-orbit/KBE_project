@@ -150,6 +150,12 @@ class COMM(ac.Subsystem):
         self.height=selected['Height']
         return selected
     
+    @Attribute
+    def comm_select_df(self):
+        df = pd.DataFrame(self.comm_selection)
+        print(df)
+        return df
+    
 
 #All good 
 class OBC(ac.Subsystem):
@@ -184,7 +190,7 @@ class OBC(ac.Subsystem):
     
 
 class EPS(ac.Subsystem):
-    color = Input('Aqua', widget=ColorPicker)
+    color = Input('Aqua', widget=ColorPicker)    
     
     Solar_cell_type = Input(default='Triple Junction GaAs rigid', widget=Dropdown(['Si rigid panel', 'HES Flexible array','Triple Junction GaAs rigid', 'Triple Junction GaAs ultraflex']))
     
@@ -197,6 +203,18 @@ class EPS(ac.Subsystem):
     
     def read_bat_from_csv(self):
         return self.read_subsystems_from_csv('Battery.csv')
+    
+    @Attribute
+    def eps_mass(self):
+        # mass = battery + solar panel mass
+        self.mass = self.battery_selection['Mass'] + self.solar_panel_mass
+        return self.battery_selection['Mass'] + self.solar_panel_mass
+    
+    @Attribute
+    def eps_cost(self):
+        # cost = battery + solar panel cost
+        self.cost = self.battery_selection['Cost'] + self.solar_panel_cost
+        return self.battery_selection['Cost'] + self.solar_panel_cost
     
     @Attribute
     def _time_period(self):
@@ -234,16 +252,16 @@ class EPS(ac.Subsystem):
 
     @Attribute
     def eclipse_power(self):
-        return(self._adcs_power * constants.Power.duty_cycle + self._communication_power['Power_Nom'] + self._obc_power + self._payload_power + self._thermal_power)
+        return(self._adcs_power * constants.Power.duty_cycle + self.avg_power_communication + self._obc_power + self._payload_power + self._thermal_power)
 
     @Attribute
     def eclipse_power_without_COM(self):
-        return(self._adcs_power * constants.Power.duty_cycle + self._obc_power + self._payload_power + self._thermal_power)
+        return(self._adcs_power * constants.Power.duty_cycle + self._obc_power + self._payload_power + self._thermal_power + self._communication_power['Power_Nom'])
 
     @Attribute
     def average_power_required(self):
         total_power = (self._adcs_power * constants.Power.duty_cycle + self.avg_power_communication + self._obc_power + self._payload_power + self._thermal_power * (self.eclipse_time/self._time_period))
-        return total_power
+        return total_power*(1+constants.SystemConfig.system_margin)
     
     @Attribute
     def number_of_charging_cycles(self):
@@ -300,7 +318,7 @@ class EPS(ac.Subsystem):
     @Attribute
     def solar_panel_cost(self):
         selected_solar_panel = self.read_SolarPanel_from_csv()
-        return (self.req_solar_panel_power/selected_solar_panel['Cost'])
+        return (selected_solar_panel['Specific_cost']*self.req_solar_panel_power*1000)
         
 
      
@@ -339,7 +357,7 @@ class Thermal(ac.Subsystem):
         adcs_mass = self.parent.adcs.mass
         comm_mass = self.parent.communication.mass
         obc_mass = self.parent.obc.mass
-        eps_mass = self.parent.power.mass
+        eps_mass = self.parent.power.eps_mass
         structure_mass = self.parent.structure.mass
         total_mass = pl_mass + adcs_mass + comm_mass + obc_mass + eps_mass + structure_mass  # grams
         return total_mass /1000 # kg mass of satellite 

@@ -35,6 +35,12 @@ class GenericConfig:
     relative_step_file_path = os.path.join(script_dir, 'step_files', 'cubesat_configuration.step')
     step_file_location = os.path.join(script_dir, relative_step_file_path)
 
+    relative_report_template_path = os.path.join('report', 'Report_Template.docx')
+    report_template_path = os.path.join(script_dir, relative_report_template_path)
+
+    relative_report_output_path = os.path.join('report', 'CubeSat_Configurator_Report.docx')
+    report_output_path = os.path.join(script_dir, relative_report_output_path)
+
 class Power:
     duty_cycle = 0.1
     F_d=0.0092

@@ -113,6 +113,7 @@ class Subsystem(GeomBase):
             self.power = selected['Power_DL'] * (tgs / (24*3600)) + selected['Power_Nom'] * (1 - (tgs / (24*3600)))
         else:
             self.power = selected["Power"]
+            
         return selected
  
     @Attribute(settable=True)

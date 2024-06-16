@@ -32,7 +32,9 @@ class CubeSat(GeomBase):
         """
         mass = 0
         for child in self.children:
-            if isinstance(child, (ac.Subsystem, Structure)) and hasattr(child, "mass"):
+            if child.__class__.__name__ == "EPS":
+                mass += child.eps_mass
+            elif isinstance(child, (ac.Subsystem, Structure)) and hasattr(child, "mass"):
                 mass += child.mass
         return mass*(1 + constants.SystemConfig.system_margin) # kg
 
@@ -54,9 +56,11 @@ class CubeSat(GeomBase):
         """
         cost = 0
         for child in self.children:
-            if isinstance(child, (ac.Subsystem, Structure)) and hasattr(child, "cost") and child.cost is not None:
+            if child.__class__.__name__ == "EPS":
+                cost += child.eps_cost
+            elif isinstance(child, (ac.Subsystem, Structure)) and hasattr(child, "cost") and child.cost is not None:
                 cost += child.cost
-        return cost # USD ( no margin for cost! )
+        return cost*(1 + constants.SystemConfig.system_margin) # USD
 
     @Attribute
     def system_data_rate(self):
@@ -128,7 +132,7 @@ class CubeSat(GeomBase):
         # number of orbits to simulate = 1 day / orbital period * days to simulate = Number of orbits to simulate
         orbits_to_simulate = np.ceil(pk.DAY2SEC / T) * days_to_simulate  # orbits
         # number of runs = number of seconds in a day / simulation timestep
-        runs = int(pk.DAY2SEC / dt)
+        runs = int(pk.DAY2SEC / dt) * days_to_simulate
         # print(f"runs: {runs}")
 
         if plotting:
