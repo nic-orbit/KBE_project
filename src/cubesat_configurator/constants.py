@@ -11,6 +11,8 @@ class PaseosConfig:
     days_to_simulate = 2  # days
     relative_plots_path = os.path.join(script_dir, 'plots', 'simulation_plots.png')
     simulation_plots_location = os.path.join(script_dir, relative_plots_path)
+    relative_animation_output_path = os.path.join('animations', 'orbit_animation')
+    animation_output_path = os.path.join(script_dir, relative_animation_output_path)
     
 
 class Thermal:

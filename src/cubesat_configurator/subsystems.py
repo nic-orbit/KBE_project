@@ -297,7 +297,7 @@ class EPS(ac.Subsystem):
 
     @Attribute
     def eclipse_power(self):
-        return(self._adcs_power * constants.Power.duty_cycle + self.avg_power_communication + self._obc_power + self._payload_power + self._thermal_power)
+        return(self._adcs_power * constants.Power.duty_cycle + self.avg_power_communication + self._obc_power + self._payload_power + self._thermal_power)*(1+constants.SystemConfig.system_margin)
 
     @Attribute
     def eclipse_power_without_COM(self):
@@ -349,7 +349,7 @@ class EPS(ac.Subsystem):
     
     @Attribute
     def req_solar_panel_power(self):
-        required_power = (self.average_power_required*(1-(self.eclipse_time/self._time_period))) + (self.eclipse_power * (self.eclipse_time/self._time_period))
+        required_power = (self.average_power_required) + (self.eclipse_power * (self.eclipse_time/(self._time_period - self.eclipse_time)))
         return (required_power)
     
     @Attribute

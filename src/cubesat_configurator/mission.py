@@ -87,6 +87,7 @@ class Mission(GeomBase):
         }
 
         fill_report_template(constants.GenericConfig.report_template_path, constants.GenericConfig.report_output_path, self.report_data, custom_tables)
+        self.cubesat.plot_simulation_data
 
     @Attribute
     def report_data(self):
