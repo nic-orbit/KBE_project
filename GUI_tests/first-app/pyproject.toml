@@ -1,0 +1,28 @@
+[project]
+name = "app"
+version = "0.1.0"
+description = "ParaPy application"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "ParaPy Software License Agreement."}
+keywords = [
+    "ParaPy application",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows",
+]
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+[build-system]
+requires = ["setuptools >= 63.0"]
+build-backend = "build_backend"
+backend-path = ["."]
+

@@ -1,0 +1,6 @@
+parapy~=1.11
+parapy-webgui~=1.1
+parapy-webgui-mui~=1.0
+parapy-webgui-layout~=0.12
+fastapi~=0.65
+uvicorn~=0.20
