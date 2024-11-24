@@ -3,6 +3,7 @@ from parapy.gui import display
 from cubesat_configurator.mission import Mission
 from pprint import pprint
 
+#test
 
 def run():
     my_mission = Mission(mission_lifetime=24, # months
